@@ -2,6 +2,7 @@
 Noobstr.me - An onboarding website for NOSTR.  Just Go!
 
 Bugs that still exist:
+- SSL pending
 - Settings menu: buttons hang off right side
 - Code comments are AI generated, some may not be relevant, some more may be needed to be added by human, and some (most) are commenting on code that I don't understand well enough to audit :D
 
