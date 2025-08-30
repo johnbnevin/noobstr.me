@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Noobstr - Simple Nostr Client</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='90' font-size='90'>🤙</text></svg>">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --bg-color: #ffffff; --text-color: #333333; --accent-orange: #ff6b35; --accent-purple: #7c3aed; --border-color: #e5e7eb; --card-bg: #f9fafb; --input-bg: #ffffff; --button-hover: #f3f4f6; }
+        [data-theme="dark"] { --bg-color: #404040; --text-color: #ffffff; --border-color: #525252; --card-bg: #525252; --input-bg: #525252; --button-hover: #525252; }
+		[data-theme="clown"] { --bg-color: #7b1fa2; --text-color: #fff700; --accent-orange: #00ff00; --accent-purple: #ff1493; --border-color: #ff4500; --card-bg: #9400d3; --input-bg: #ff6347; --button-hover: #32cd32; }
+		body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: var(--bg-color); color: var(--text-color); transition: all 0.3s ease; }
+        input, select, button { padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background-color: var(--input-bg); color: var(--text-color); font-size: 14px; }
+        input { flex: 1; }
+        button { cursor: pointer; background-color: var(--input-bg); border: 1px solid var(--border-color); transition: background-color 0.2s; }
+        button:hover { background-color: var(--button-hover); }
+        .top-bar { position: sticky; top: 0; background-color: var(--bg-color); border-bottom: 1px solid var(--border-color); padding: 12px 16px; display: flex; align-items: center; gap: 12px; z-index: 100; }
+        .logo { font-size: 24px; font-weight: bold; color: var(--accent-orange); }
+        .input-group { display: flex; gap: 8px; flex: 1; max-width: 600px; }
+        .icon-btn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 18px; border-radius: 6px; }
+        .controls { display: flex; gap: 12px; padding: 16px; background-color: var(--card-bg); border-bottom: 1px solid var(--border-color); }
+        .control-group { display: flex; align-items: center; gap: 8px; }
+        .control-group label { font-size: 14px; font-weight: 500; }
+        .main-content { padding: 20px; max-width: 800px; margin: 0 auto; padding-bottom: 80px; }
+        .note { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+		.note-header { display: flex; justify-content: between; margin-bottom: 8px; font-size: 14px; color: var(--accent-purple); }
+		.note-content { line-height: 1.5; margin-bottom: 8px; word-break: break-all; overflow-wrap: break-word; }
+		.note-time { font-size: 12px; color: #6b7280; margin-left: 12px; }
+		.loading { text-align: center; padding: 20px; color: #6b7280; }
+		.error { color: #ef4444; text-align: center; padding: 20px; }
+		.bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background-color: var(--bg-color); border-top: 1px solid var(--border-color); padding: 8px 16px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; height: 40px; }
+		.bottom-links a { color: var(--accent-orange); text-decoration: none; }
+		.bottom-links a:hover { text-decoration: underline; }
+		.control-group { display: flex; align-items: center; gap: 4px; font-size: 14px; }
+		.control-group input[type="checkbox"] { width: auto; margin: 0; }
+		.modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); z-index: 1000; }
+		.modal-content { background-color: var(--bg-color); margin: 10% auto; padding: 20px; border-radius: 8px; width: 90%; max-width: 500px; position: relative; }
+        .modal h3 { margin-bottom: 16px; color: var(--accent-purple); }
+        .settings-section { margin-bottom: 20px; }
+        .settings-section h4 { margin-bottom: 8px; font-size: 14px; color: var(--text-color); }
+        .settings-item { display: flex; gap: 8px; margin-bottom: 8px; }
+        .settings-item input { flex: 1; }
+		.close { position: absolute; right: 10px; top: 10px; font-size: 28px; cursor: pointer; }
+		.empty-state { text-align: center; padding: 40px 20px; color: #6b7280; }
+		.message-banner { display: none; background-color: var(--accent-orange); color: white; padding: 3px 15px; position: relative; border-bottom: 1px solid var(--border-color); font-size: 12px; line-height: 1.2; }
+		.message-banner.show { display: block; }
+		.banner-close { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: white; font-size: 18px; cursor: pointer; padding: 0; width: 24px; height: 24px; }
+		.banner-close:hover { background-color: rgba(255, 255, 255, 0.2); border-radius: 50%; }
+		.console-banner { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; margin: 16px; max-height: none; overflow-y: auto; font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 12px; line-height: 1.4; display: none; }
+		.console-banner.show { display: block; }
+		.console-entry { padding: 2px 8px; border-bottom: 1px solid var(--border-color); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+		.console-entry.warn { color: #f59e0b; }
+		.console-entry.error { color: #ef4444; }
+		.console-entry.success { color: #10b981; }
+		.console-entry:last-child { border-bottom: none; }
+		.console-header { padding: 4px 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background-color: var(--border-color); }
+		.console-content { display: none; max-height: 100px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+		.console-content.expanded { display: block; }
+		@media (max-width: 768px) { .top-bar { flex-wrap: wrap; gap: 8px; } .input-group { width: 100%; } .controls { flex-wrap: wrap; gap: 8px; } }
+    </style>
+</head>
+
+<body>
+    <div class="top-bar">
+        <div class="logo">🤙 Noobstr</div>
+		<div class="input-group">
+			<input type="text" id="npubInput" placeholder="Enter npub or relay URL...">
+			<select id="savedSelector">
+				<option value="">Select saved...</option>
+			</select>
+			<button onclick="loadFeed()" style="background-color: var(--accent-orange); color: white; font-weight: bold;">Just Go!</button>
+		</div>
+		<select id="sortOrder">
+			<option value="newest">↓ Newest</option>
+			<option value="oldest">↑ Oldest</option>
+		</select>
+		<button class="icon-btn" onclick="openSettings()">⚙️</button>
+		<button class="icon-btn" onclick="toggleTheme()" id="themeBtn">🌙</button>
+		<label class="control-group">
+			<input type="checkbox" id="slowConnection"> Slow connection?
+		</label>
+    </div>
+
+	<div id="messageBanner" class="message-banner">
+		<span id="bannerText"></span>
+		<button id="bannerClose" class="banner-close">&times;</button>
+	</div>
+
+    <div class="main-content">
+		<div class="console-banner" id="consoleBanner">
+			<div class="console-header" onclick="toggleConsoleLog()">
+				<span>🔧 Debugger: <span id="latestMessage">Ready...</span></span>
+				<span id="expandIcon">▼</span>
+			</div>
+			<div class="console-content" id="consoleContent"></div>
+		</div>
+	
+        <div id="feedContainer">
+            <div class="empty-state">
+                <h3>Welcome to Noobstr!</h3>
+                <p>Click the 'Just Go!' button to see what's on NOSTR!</p>
+				<p>Enter an npub to see their follows' notes, or enter a relay URL to see notes from that relay.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-bar">
+        <div class="bottom-links">
+            <span>Ready to go Full Nostr? <a href="https://nostr.how" target="_blank" rel="noopener noreferrer">Comment, Reply, Zap Bitcoin!</a> | <a href="https://grownostr.org/get-started.html">More Info</a></span>
+        </div>
+        <div class="bottom-links">
+            <span>Vibecoded with Love. <a href="https://coinos.io/pay/jbnevin">Donate!</a></span>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeSettings()">&times;</span>
+            <h3>Settings</h3>
+            
+			<p style="margin-bottom: 20px; color: #6b7280; font-size: 14px; line-height: 1.4;">Save frequently-used npubs and relay URLs here. Once saved, they'll appear in the "Select saved..." dropdown for one-click access. All data is stored locally on your device.</p>
+			
+            <div class="settings-section">
+                <h4>Saved Npubs</h4>
+                <div id="npubsList"></div>
+                <div class="settings-item">
+                    <input type="text" id="newNpubName" placeholder="Name">
+                    <input type="text" id="newNpubValue" placeholder="npub...">
+                    <button onclick="addNpub()">Add</button>
+                </div>
+            </div>
+
+			<div class="settings-section">
+							<h4>Saved Relays</h4>
+							<div id="relaysList"></div>
+							<div class="settings-item">
+								<input type="text" id="newRelayName" placeholder="Name">
+								<input type="text" id="newRelayValue" placeholder="wss://..." value="wss://">
+								<button onclick="addRelay()">Add</button>
+							</div>
+						</div>
+
+						<div class="settings-section">
+							<h4>Need Help Finding Npubs & Relays?</h4>
+							<p style="font-size: 13px; color: #6b7280; margin-bottom: 12px; line-height: 1.4;">
+								<strong>Npubs:</strong> Find NOSTRiches who have good follow lists at <a href="https://nostr.directory" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange);">nostr.directory</a> <br>
+								<strong>Relays:</strong> Find a NOSTR public relays to browse at <a href="https://nostr.watch" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange);">nostr.watch</a>
+							</p>
+							<p style="font-size: 13px; color: #6b7280; margin-bottom: 8px;">
+								Ready for the full Nostr experience? 
+								<a href="https://nostr.how" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); font-weight: bold;">Learn how to post, reply, and zap Bitcoin</a> | <a href="https://grownostr.org/get-started.html">More Info</a>
+							</p>
+						</div>
+					</div>
+				</div>
+	
+		<!-- Help Modal -->
+	<div id="helpModal" class="modal">
+		<div class="modal-content">
+			<span class="close" onclick="closeHelpModal()">&times;</span>
+			<h3>How to Use Noobstr</h3>
+			
+			<div class="settings-section">
+				<h4>Quick Start</h4>
+				<p><strong>Just Go!</strong> - Loads a demo feed to see how Nostr works</p>
+			</div>
+
+			<div class="settings-section">
+				<h4>Advanced Options</h4>
+				<p><strong>npub</strong> - Enter someone's npub to see who they follow</p>
+				<p><strong>Relay URL</strong> - Enter wss://relay.example.com to see all recent notes from that relay</p>
+				<p><strong>Time Range</strong> - How far back to look (6h = faster, 72h = more notes)</p>
+				<p><strong>Sort Order</strong> - Newest first or oldest first</p>
+				<p><strong>Slow Connection</strong> - Check this on old phones or slow internet</p>
+			</div>
+
+			<div class="settings-section">
+				<h4>Saving Favorites</h4>
+				<p>Use the Settings gear to save your favorite npubs and relays for quick access.</p>
+			</div>
+		</div>
+	</div>
+
+    <script>
+        let currentFeed = [];
+        let currentType = null;
+        let currentValue = null;
+        let isLoading = false;
+		let isLookingUpUsernames = false;
+		let bannerTimeout = null;
+		
+		// Console logging system
+		let consoleEntries = [];
+		const MAX_CONSOLE_ENTRIES = 1000;
+
+		function logToConsole(message, type = 'log') {
+			if (console[type]) {
+				console[type](message);
+			} else {
+				console.log(message);
+			}
+			
+			// Check if slow connection is enabled - if so, don't show console
+			const slowConnection = document.getElementById('slowConnection');
+			if (slowConnection && slowConnection.checked) {
+				return;
+			}
+			
+			const timestamp = new Date().toLocaleTimeString();
+			consoleEntries.unshift({ message, type, timestamp });
+			
+			if (consoleEntries.length > MAX_CONSOLE_ENTRIES) {
+				consoleEntries = consoleEntries.slice(0, MAX_CONSOLE_ENTRIES);
+			}
+			
+			// Show the consolebanner and update latest message
+			const consoleBanner = document.getElementById('consoleBanner');
+			const latestMessage = document.getElementById('latestMessage');
+			
+			if (!consoleBanner.classList.contains('show')) {
+				consoleBanner.classList.add('show');
+			}
+			
+			latestMessage.textContent = message;
+			
+			// Update full log if expanded
+			updateConsoleContent();
+		}
+
+		function toggleConsoleLog() {
+			const consoleContent = document.getElementById('consoleContent');
+			const expandIcon = document.getElementById('expandIcon');
+			
+			if (consoleContent.classList.contains('expanded')) {
+				consoleContent.classList.remove('expanded');
+				expandIcon.textContent = '▼';
+			} else {
+				consoleContent.classList.add('expanded');
+				expandIcon.textContent = '▲';
+				updateConsoleContent();
+			}
+		}
+
+		function updateConsoleContent() {
+			const consoleContent = document.getElementById('consoleContent');
+			if (!consoleContent.classList.contains('expanded')) return;
+			
+			consoleContent.innerHTML = '';
+			consoleEntries.forEach(entry => {
+				const div = document.createElement('div');
+				div.className = `console-entry ${entry.type || 'log'}`;
+				
+				const timeSpan = document.createElement('span');
+				timeSpan.style.color = '#6b7280';
+				timeSpan.textContent = `[${entry.timestamp}] `;
+				
+				const messageSpan = document.createElement('span');
+				messageSpan.textContent = entry.message;
+				
+				div.appendChild(timeSpan);
+				div.appendChild(messageSpan);
+				consoleContent.appendChild(div);
+			});
+		}
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSettings();
+            updateSavedSelector();
+			logToConsole('Noobstr initialized! 🤙');
+        });
+
+		function npubToPubkey(npub) {
+			if (!npub.startsWith('npub')) {
+				throw new Error('Not a valid npub');
+			}
+
+			// Bech32 alphabet - these are the allowed characters
+			const alphabet = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+			
+			try {
+				const data = npub.slice(4);
+				
+				// Convert each character to its number value
+				const decoded = [];
+				for (let i = 0; i < data.length; i++) {
+					const char = data[i];
+					const value = alphabet.indexOf(char);
+					if (value === -1) {
+						throw new Error('Invalid character in npub');
+					}
+					decoded.push(value);
+				}
+				
+				// Skip checksum (last 6 characters) and convert from 5-bit to 8-bit
+				const payload = decoded.slice(1, -6);
+				const pubkeyBytes = convertBits(payload, 5, 8, false);
+				
+				// Convert to hex string
+				const pubkey = pubkeyBytes.map(b => b.toString(16).padStart(2, '0')).join('');
+				
+				logToConsole("🔑 Decoded npub to pubkey: " + pubkey);
+				return pubkey;
+				
+			} catch (error) {
+				throw new Error('Invalid npub format: ' + error.message);
+			}
+		}
+
+		// Helper function to convert between bit groups
+		function convertBits(data, fromBits, toBits, pad) {
+			let acc = 0;
+			let bits = 0;
+			const ret = [];
+			const maxv = (1 << toBits) - 1;
+			
+			for (let i = 0; i < data.length; i++) {
+				const value = data[i];
+				acc = (acc << fromBits) | value;
+				bits += fromBits;
+				
+				while (bits >= toBits) {
+					bits -= toBits;
+					ret.push((acc >> bits) & maxv);
+				}
+			}
+			
+			if (pad && bits > 0) {
+				ret.push((acc << (toBits - bits)) & maxv);
+			}
+			
+			return ret;
+		}
+
+		function toggleTheme() {
+			const body = document.body;
+			const currentTheme = body.getAttribute('data-theme') || 'light';
+			
+			let newTheme;
+			if (currentTheme === 'light') {
+				newTheme = 'dark';
+			} else if (currentTheme === 'dark') {
+				newTheme = 'clown';
+			} else {
+				newTheme = 'light';
+			}
+			
+			body.setAttribute('data-theme', newTheme);
+			localStorage.setItem('theme', newTheme);
+		}
+
+        // Load saved theme
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.body.setAttribute('data-theme', savedTheme);
+
+		document.addEventListener('DOMContentLoaded', function() {
+			updateThemeIcon();
+		});
+
+        // Settings management
+        function loadSettings() {
+            const npubs = JSON.parse(localStorage.getItem('savedNpubs') || '[]');
+            const relays = JSON.parse(localStorage.getItem('savedRelays') || '[]');
+            updateSettingsDisplay();
+        }
+
+        function saveSettings() {
+            updateSavedSelector();
+        }
+
+		function updateSavedSelector() {
+			const selector = document.getElementById('savedSelector');
+			const npubs = JSON.parse(localStorage.getItem('savedNpubs') || '[]');
+			const relays = JSON.parse(localStorage.getItem('savedRelays') || '[]');
+			
+			// Clear selector
+			selector.innerHTML = '<option value="">Select saved...</option>';
+			
+			// Add demo option
+			const demoOption = document.createElement('option');
+			demoOption.value = 'npub1v89nr2zax8ef0ceyu9te0sjyqv3newa3e82m0rd4kye3ekeyhv2sqf30cc';
+			demoOption.textContent = '🤙 Demo (Default)';
+			selector.appendChild(demoOption);
+			
+			// Add npub section if there are any saved npubs
+			if (npubs.length > 0) {
+				const npubGroup = document.createElement('optgroup');
+				npubGroup.label = 'Saved Npubs';
+				
+				npubs.forEach(item => {
+					const option = document.createElement('option');
+					option.value = item.value;
+					option.textContent = `👤 ${item.name}`;
+					npubGroup.appendChild(option);
+				});
+				
+				selector.appendChild(npubGroup);
+			}
+			
+			// Add relay section if there are any saved relays  
+			if (relays.length > 0) {
+				const relayGroup = document.createElement('optgroup');
+				relayGroup.label = 'Saved Relays';
+				
+				relays.forEach(item => {
+					const option = document.createElement('option');
+					option.value = item.value;
+					option.textContent = `⚡ ${item.name}`;
+					relayGroup.appendChild(option);
+				});
+				
+				selector.appendChild(relayGroup);
+			}
+		}
+
+		function updateSettingsDisplay() {
+			const npubs = JSON.parse(localStorage.getItem('savedNpubs') || '[]');
+			const relays = JSON.parse(localStorage.getItem('savedRelays') || '[]');
+			
+			const npubsList = document.getElementById('npubsList');
+			const relaysList = document.getElementById('relaysList');
+			
+			// Clear existing content
+			npubsList.innerHTML = '';
+			relaysList.innerHTML = '';
+			
+			// Build npubs list safely
+			npubs.forEach((item, index) => {
+				const div = document.createElement('div');
+				div.className = 'settings-item';
+				
+				const nameInput = document.createElement('input');
+				nameInput.type = 'text';
+				nameInput.value = item.name;
+				nameInput.readOnly = true;
+				
+				const valueInput = document.createElement('input');
+				valueInput.type = 'text';
+				valueInput.value = item.value;
+				valueInput.readOnly = true;
+				
+				const removeBtn = document.createElement('button');
+				removeBtn.textContent = 'Remove';
+				removeBtn.onclick = () => removeNpub(index);
+				
+				div.appendChild(nameInput);
+				div.appendChild(valueInput);
+				div.appendChild(removeBtn);
+				npubsList.appendChild(div);
+			});
+			
+			// Build relays list safely
+			relays.forEach((item, index) => {
+				const div = document.createElement('div');
+				div.className = 'settings-item';
+				
+				const nameInput = document.createElement('input');
+				nameInput.type = 'text';
+				nameInput.value = item.name;
+				nameInput.readOnly = true;
+				
+				const valueInput = document.createElement('input');
+				valueInput.type = 'text';
+				valueInput.value = item.value;
+				valueInput.readOnly = true;
+				
+				const removeBtn = document.createElement('button');
+				removeBtn.textContent = 'Remove';
+				removeBtn.onclick = () => removeRelay(index);
+				
+				div.appendChild(nameInput);
+				div.appendChild(valueInput);
+				div.appendChild(removeBtn);
+				relaysList.appendChild(div);
+			});
+		}
+
+		function showMessageBanner(message, duration = 3000) {
+			const banner = document.getElementById('messageBanner');
+			const bannerText = document.getElementById('bannerText');
+			
+			// Clear any existing timeout
+			if (bannerTimeout) {
+				clearTimeout(bannerTimeout);
+			}
+			
+			// Set the message and show banner
+			bannerText.textContent = message;
+			banner.classList.add('show');
+			
+			// Auto-hide after duration
+			bannerTimeout = setTimeout(() => {
+				hideBanner();
+			}, duration);
+		}
+
+		function hideBanner() {
+			const banner = document.getElementById('messageBanner');
+			banner.classList.remove('show');
+			if (bannerTimeout) {
+				clearTimeout(bannerTimeout);
+				bannerTimeout = null;
+			}
+		}
+
+		function addNpub() {
+					const name = document.getElementById('newNpubName').value.trim();
+					const value = document.getElementById('newNpubValue').value.trim();
+					
+					if (!name && !value) {
+						showMessageBanner("Please enter both a name and npub", 3000);
+						return;
+					}
+					if (!name) {
+						showMessageBanner("Please enter a name for this npub", 3000);
+						return;
+					}
+					if (!value) {
+						showMessageBanner("Please enter an npub value", 3000);
+						return;
+					}
+					
+					const npubs = JSON.parse(localStorage.getItem('savedNpubs') || '[]');
+					npubs.push({ name, value });
+					localStorage.setItem('savedNpubs', JSON.stringify(npubs));
+					
+					document.getElementById('newNpubName').value = '';
+					document.getElementById('newNpubValue').value = '';
+					
+					updateSettingsDisplay();
+					updateSavedSelector();
+					
+					showMessageBanner(`Saved npub: ${name}`, 2000);
+				}
+
+				function addRelay() {
+							const name = document.getElementById('newRelayName').value.trim();
+							const value = document.getElementById('newRelayValue').value.trim();
+							
+							if (!name && !value) {
+								showMessageBanner("Please enter both a name and relay URL", 3000);
+								return;
+							}
+							if (!name) {
+								showMessageBanner("Please enter a name for this relay", 3000);
+								return;
+							}
+							if (!value) {
+								showMessageBanner("Please enter a relay URL", 3000);
+								return;
+							}
+							
+							const relays = JSON.parse(localStorage.getItem('savedRelays') || '[]');
+							relays.push({ name, value });
+							localStorage.setItem('savedRelays', JSON.stringify(relays));
+							
+							document.getElementById('newRelayName').value = '';
+							document.getElementById('newRelayValue').value = '';
+							
+							updateSettingsDisplay();
+							updateSavedSelector();
+							
+							showMessageBanner(`Saved relay: ${name}`, 2000);
+						}
+
+        function removeNpub(index) {
+            const npubs = JSON.parse(localStorage.getItem('savedNpubs') || '[]');
+            npubs.splice(index, 1);
+            localStorage.setItem('savedNpubs', JSON.stringify(npubs));
+            updateSettingsDisplay();
+            updateSavedSelector();
+        }
+
+        function removeRelay(index) {
+            const relays = JSON.parse(localStorage.getItem('savedRelays') || '[]');
+            relays.splice(index, 1);
+            localStorage.setItem('savedRelays', JSON.stringify(relays));
+            updateSettingsDisplay();
+            updateSavedSelector();
+        }
+
+        function openSettings() {
+            document.getElementById('settingsModal').style.display = 'block';
+            updateSettingsDisplay();
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+
+        // Feed management
+        function getInputValue() {
+            const input = document.getElementById('npubInput').value.trim();
+            const selector = document.getElementById('savedSelector').value;
+            return input || selector;
+        }
+
+        function determineInputType(value) {
+            if (value.startsWith('npub')) return 'npub';
+            if (value.startsWith('wss://') || value.startsWith('ws://')) return 'relay';
+            return null;
+        }
+
+		function loadFeed() {
+			logToConsole('Load button clicked!');
+			const value = getInputValue();
+			
+			// If no input, use default feed
+			if (!value) {
+				logToConsole('No input found - loading default feed for beginners!');
+				
+				const defaultNpub = 'npub1v89nr2zax8ef0ceyu9te0sjyqv3newa3e82m0rd4kye3ekeyhv2sqf30cc';
+				
+				currentType = 'npub';
+				currentValue = defaultNpub;
+				
+				// Clear feed and start loading
+				currentFeed = [];
+				displayFeed([]);
+				
+				loadNpubFeed(defaultNpub);
+				
+				// Show info about what they're viewing
+				setTimeout(() => {
+					showDefaultFeedInfo();
+				}, 2000);
+				return;
+			}
+
+			const type = determineInputType(value);
+			logToConsole('Input type detected: ' + (type || 'invalid') + ' for: ' + value);
+			if (!type) {
+				alert('Please enter a valid npub (starts with npub) or relay URL (starts with wss://)');
+				return;
+			}
+
+			// Clear feed when switching types or values
+			if (currentType !== type || currentValue !== value) {
+				currentFeed = [];
+				displayFeed([]);
+			}
+
+			currentType = type;
+			currentValue = value;
+
+			if (type === 'npub') {
+				loadNpubFeed(value);
+			} else {
+				loadRelayFeed(value);
+			}
+		}
+
+		async function loadNpubFeed(npub) {
+			if (isLoading) return;
+			
+			setLoading(true);
+			
+			let timeout;
+			const realNotes = [];
+			let someFollows = [];
+			let since = 0;
+			let topLevelNotesCount = 0;
+			const targetNotes = 100;
+			let currentLimit = 200; // Start with this many notes per request
+			
+			try {
+				logToConsole("🔍 Looking up follows for: " + npub);
+
+				// Convert npub to pubkey, or use default if it's the default npub
+				let realPubkey;
+				if (npub === 'npub1v89nr2zax8ef0ceyu9te0sjyqv3newa3e82m0rd4kye3ekeyhv2sqf30cc') {
+					// Use hardcoded pubkey for default demo
+					realPubkey = "61cb31a85d31f297e324e15797c24403233cbbb1c9d5b78db5b1331cdb24bb15";
+				} else {
+					// Convert user's npub to pubkey
+					try {
+						realPubkey = npubToPubkey(npub);
+					} catch (error) {
+						showError('Invalid npub format: ' + error.message);
+						setLoading(false);
+						return;
+					}
+				}
+
+				logToConsole("🔑 Using pubkey: " + realPubkey);
+				
+				const relay = new WebSocket('wss://relay.damus.io');
+
+				relay.onopen = function() {
+					clearTimeout(timeout);
+					logToConsole("🎉 Connected to get follows list", 'success');
+					
+					const followsRequest = [
+						"REQ",
+						"get-follows",
+						{
+							"kinds": [3],
+							"authors": [realPubkey],
+							"limit": 1
+						}
+					];
+					
+					logToConsole("📤 Asking for follows list...");
+					relay.send(JSON.stringify(followsRequest));
+				};
+
+				// Set timeout after declaring it
+				timeout = setTimeout(() => {
+					logToConsole("Relay connection timed out", 'warn');
+					relay.close();
+					showError("Connection timed out. The relay may be busy - try again in a moment.");
+					setLoading(false);
+				}, 10000);
+				
+				relay.onopen = function() {
+					try {
+						clearTimeout(timeout);
+						logToConsole("🎉 Connected to get follows list", 'success');
+						
+						const followsRequest = [
+							"REQ",
+							"get-follows",
+							{
+								"kinds": [3],
+								"authors": [realPubkey],
+								"limit": 1
+							}
+						];
+						
+						logToConsole("📤 Asking for follows list...");
+						relay.send(JSON.stringify(followsRequest));
+					} catch (error) {
+						logToConsole("💥 Error in onopen handler: " + error.message, 'error');
+					}
+				};
+				
+				relay.onmessage = function(event) {
+					clearTimeout(timeout); // Now this should work
+					
+					logToConsole("📨 RAW MESSAGE FROM RELAY: " + event.data);
+					
+					try {
+						const message = JSON.parse(event.data);
+						logToConsole("📨 PARSED MESSAGE: " + JSON.stringify(message));
+						logToConsole("📨 MESSAGE TYPE: " + message[0]);
+						
+						if (message[0] === "EVENT" && message[2].kind === 1) {
+							const noteData = message[2];
+							// Skip replies (notes with 'e' tags)
+							const isReply = noteData.tags && noteData.tags.some(tag => tag[0] === 'e');
+							if (isReply) {
+								logToConsole("⏭️ Skipping reply note");
+								return;
+							}
+							logToConsole("📝 Got note: " + noteData.content.slice(0, 50) + "...");
+							
+							const prettyNote = {
+								id: noteData.id,
+								pubkey: noteData.pubkey,
+								author: noteData.pubkey.slice(0, 8) + "...",
+								npub: "npub" + noteData.pubkey.slice(-8),
+								content: noteData.content,
+								timestamp: noteData.created_at,
+								source: 'from follows! 🎯'
+							};
+
+							// Check if we already have this note
+							const existingNote = realNotes.find(note => note.id === noteData.id);
+							if (!existingNote) {
+								realNotes.push(prettyNote);
+							}
+							}
+						
+						if (message[0] === "EVENT" && message[2].kind === 3) {
+							const followsEvent = message[2];
+							logToConsole("📋 Got follows list!");
+							
+							const followedPubkeys = [];
+							followsEvent.tags.forEach(tag => {
+								if (tag[0] === 'p') {
+									followedPubkeys.push(tag[1]);
+								}
+							});
+							
+							logToConsole("🤝 This person follows " + followedPubkeys.length + " people");
+							
+							// NEW: Now ask for notes from those follows
+							logToConsole("📝 Now getting notes from their follows...");
+							
+							const maxFollowsToCheck = document.getElementById('slowConnection').checked ? 100 : 500;
+							someFollows = followedPubkeys.slice(0, maxFollowsToCheck);
+							since = Math.floor(Date.now() / 1000) - (24 * 60 * 60);
+							
+							const notesRequest = [
+								"REQ",
+								"get-notes",
+								{
+									"kinds": [1],
+									"authors": someFollows,
+									"since": since,
+									"limit": 100  // Fixed at 100 notes max
+								}
+							];
+							
+							logToConsole("📤 Asking for notes from " + someFollows.length + " follows (max " + maxFollowsToCheck + ")");
+							relay.send(JSON.stringify(notesRequest));
+							
+						}
+						
+						if (message[0] === "EOSE") {
+							logToConsole("⏹ EOSE for subscription: " + message[1]);
+							
+							if (message[1] === "get-follows") {
+								logToConsole("✅ Done getting follows list");
+								// Don't close - we're still waiting for notes
+							}
+							
+							if (message[1] === "get-notes") {
+								logToConsole("✅ Done getting notes from follows", 'success');
+								logToConsole("📊 Current count: " + realNotes.length + " notes");
+								
+								if (realNotes.length < 100) {
+									logToConsole("🔄 Need more notes, increasing limit and trying again");
+									currentLimit = currentLimit + 200;
+									
+									const notesRequest = [
+										"REQ",
+										"get-more-notes",
+										{
+											"kinds": [1],
+											"authors": someFollows,
+											"since": since,
+											"limit": currentLimit
+										}
+									];
+									
+									relay.send(JSON.stringify(notesRequest));
+									return;
+								}
+								
+								currentFeed = realNotes;
+								displayFeed(realNotes);
+								setLoading(false);
+								relay.close();
+								logToConsole("🔌 Connection closed - got enough notes");
+							}
+							
+							if (message[1] === "get-more-notes") {
+								logToConsole("✅ Done getting additional notes", 'success');
+								logToConsole("📊 Final count: " + realNotes.length + " notes");
+								
+								if (realNotes.length < 100 && currentLimit < 2000) {
+									logToConsole("🔄 Still need more, trying again");
+									currentLimit = currentLimit + 200;
+									
+									const notesRequest = [
+										"REQ",
+										"get-more-notes",
+										{
+											"kinds": [1],
+											"authors": someFollows,
+											"since": since,
+											"limit": currentLimit
+										}
+									];
+									
+									relay.send(JSON.stringify(notesRequest));
+									return;
+								}
+								
+								currentFeed = realNotes;
+								displayFeed(realNotes); // ← ADD THIS LINE
+								setLoading(false);
+								relay.close();
+								logToConsole("🔌 Connection closed - stopping at " + realNotes.length + " notes");
+							}
+						}
+						
+						if (message[0] === "NOTICE") {
+							logToConsole("🔔 RELAY NOTICE: " + message[1]);
+							showError("Relay notice: " + message[1]);
+						}
+						
+					} catch (e) {
+						logToConsole("💥 FAILED TO PARSE MESSAGE: " + e);
+					}
+				};
+				
+				relay.onerror = function(error) {
+					if (timeout) clearTimeout(timeout);
+					showError('Unable to connect to Nostr relay.');
+					setLoading(false);
+				};
+				
+			} catch (error) {
+				if (timeout) clearTimeout(timeout);
+				showError('Failed to load npub feed: ' + error.message);
+				setLoading(false);
+			}
+		}
+
+		async function loadRelayFeed(relayUrl) {
+			if (isLoading) return;
+			
+			setLoading(true);
+			
+			let topLevelNotesCount = 0;
+			const targetNotes = 100;
+			let currentLimit = 200; // Start with this many notes per request
+			const realNotes = []; 			
+			let since = 0; 
+			
+			try {
+				logToConsole("Trying to connect to: " + relayUrl);
+				
+				const relay = new WebSocket(relayUrl);
+
+				
+				relay.onopen = function() {
+					logToConsole("🎉 Connected to relay: " + relayUrl);
+					
+					since = Math.floor(Date.now() / 1000) - (24 * 60 * 60); // Always 24 hours (remove const)
+					const requestMessage = [
+						"REQ",
+						"my-sub-id",
+						{
+							"kinds": [1],
+							"since": since,
+							"limit": 1000  // Fixed at 1000 notes max (current setting)
+						}
+					];
+					
+					logToConsole("📤 Asking relay for notes");
+					relay.send(JSON.stringify(requestMessage));
+				};
+				
+				relay.onmessage = function(event) {
+					const message = JSON.parse(event.data);
+					logToConsole("📨 Got message type: " + message[0]);
+					
+					if (message[0] === "EVENT") {
+						const noteData = message[2]; // The actual note content
+						const isReply = noteData.tags && noteData.tags.some(tag => tag[0] === 'e');
+						if (isReply) {
+							logToConsole("⏭️ Skipping reply note");
+							return;
+						}
+						logToConsole("📝 Got a real note: " + noteData.content.slice(0, 50) + "...");
+						
+						const prettyNote = {
+							id: noteData.id,
+							pubkey: noteData.pubkey,
+							author: noteData.pubkey.slice(0, 8) + "...",
+							npub: "npub" + noteData.pubkey.slice(-8),
+							content: noteData.content,
+							timestamp: noteData.created_at,
+							source: 'real relay data! 🎉'
+						};
+
+						// Check if we already have this note
+						const existingNote = realNotes.find(note => note.id === noteData.id);
+						if (!existingNote) {
+							realNotes.push(prettyNote);
+						}
+						}
+					
+					if (message[0] === "EOSE") {
+						logToConsole("✅ EOSE for subscription: " + message[1]);
+						
+						if (message[1] === "my-sub-id" || message[1] === "get-more-relay-notes") {
+							logToConsole("📊 Current count: " + realNotes.length + " notes");
+							
+							if (realNotes.length < 100 && currentLimit < 2000) {
+								logToConsole("🔄 Need more notes from relay, increasing limit");
+								currentLimit = currentLimit + 500;
+								
+								const requestMessage = [
+									"REQ",
+									"get-more-relay-notes",
+									{
+										"kinds": [1],
+										"since": since,
+										"limit": currentLimit
+									}
+								];
+								
+								relay.send(JSON.stringify(requestMessage));
+								return;
+							}
+							
+							currentFeed = realNotes;
+							displayFeed(realNotes); // ← ADD THIS LINE
+							setLoading(false);
+							relay.close();
+							logToConsole("🔌 Connection closed - stopping at " + realNotes.length + " notes");
+						}
+					}
+				};
+				
+				relay.onerror = function(error) {
+					logToConsole("💥 Connection error: " + error);
+					showError('Failed to connect to relay');
+					setLoading(false);
+				};
+				
+			} catch (error) {
+				showError('Failed to load relay feed: ' + error.message);
+				setLoading(false);
+			}
+		}
+
+		function displayFeed(notes, fetchUsernames = true) {
+			const container = document.getElementById('feedContainer');
+			const sortOrder = document.getElementById('sortOrder').value;
+			
+			// ALWAYS clear the container first
+			container.innerHTML = '';
+			
+			// Check if we might have hit the limit and add warning AFTER clearing
+			if (notes.length >= 500) {
+				const warning = document.createElement('div');
+				warning.style.cssText = 'background: #fef3c7; border: 1px solid #f59e0b; padding: 8px; margin-bottom: 16px; border-radius: 6px; font-size: 14px;';
+				warning.textContent = '⚠️ Showing 1000+ notes (may be incomplete). This relay has lots of activity!';
+				container.appendChild(warning);
+			}
+			
+			if (notes.length === 0) {
+				container.innerHTML = '<div class="empty-state"><p>No notes found for the selected criteria.</p></div>';
+				return;
+			}
+			
+			// Sort notes
+			const sortedNotes = [...notes].sort((a, b) => {
+				return sortOrder === 'newest' ? b.timestamp - a.timestamp : a.timestamp - b.timestamp;
+			});
+			
+			sortedNotes.forEach(note => {
+				const noteElement = document.createElement('div');
+				noteElement.className = 'note';
+				
+				const date = new Date(note.timestamp * 1000);
+				const timeString = date.toLocaleString();
+				const relativeTime = formatRelativeTime(note.timestamp);
+				
+				const authorDisplay = note.displayName || (note.pubkey ? note.pubkey.slice(0, 8) + "..." : note.author);
+				
+				const noteHeader = document.createElement('div');
+				noteHeader.className = 'note-header';
+
+				const authorStrong = document.createElement('strong');
+				authorStrong.className = 'author-name';
+				authorStrong.setAttribute('data-pubkey', note.pubkey || '');
+				authorStrong.textContent = authorDisplay; 
+
+				const timeSpan = document.createElement('span');
+				timeSpan.className = 'note-time';
+				timeSpan.textContent = `${relativeTime} (${timeString})`;
+
+				noteHeader.appendChild(authorStrong);
+				noteHeader.appendChild(timeSpan);
+
+				const noteContentDiv = document.createElement('div');
+				noteContentDiv.className = 'note-content';
+
+				// Truncate content to first X characters
+				const maxLength = 420; // Change this number to whatever you want
+				const truncatedContent = note.content.length > maxLength 
+					? note.content.slice(0, maxLength) + '...'
+					: note.content;
+
+				noteContentDiv.innerHTML = escapeHtml(truncatedContent);
+
+				noteElement.appendChild(noteHeader);
+				noteElement.appendChild(noteContentDiv);
+				
+				// Add avatar if we have one
+				if (note.avatar && !document.getElementById('slowConnection').checked) {
+					const authorElement = noteElement.querySelector('.author-name');
+					const avatar = document.createElement('img');
+					avatar.src = note.avatar;
+					avatar.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; margin-right: 8px; vertical-align: middle;';
+					avatar.alt = 'Profile photo';
+					avatar.onerror = function() { this.style.display = 'none'; }; // Hide if image fails
+					authorElement.insertBefore(avatar, authorElement.firstChild);
+				}
+				
+				container.appendChild(noteElement);
+			});
+			
+			// Only fetch usernames if we don't have them yet
+			if (fetchUsernames) {
+				setTimeout(() => {
+					fetchAndUpdateUsernames();
+				}, 100);
+			}
+		}
+
+		function openHelpModal() {
+			document.getElementById('helpModal').style.display = 'block';
+		}
+
+		function closeHelpModal() {
+			document.getElementById('helpModal').style.display = 'none';
+		}
+
+        function updateThemeIcon() {
+            const themeBtn = document.getElementById('themeBtn');
+            const currentTheme = document.body.getAttribute('data-theme') || 'light';
+            
+            if (currentTheme === 'dark') {
+                themeBtn.textContent = '🌙';
+            } else if (currentTheme === 'clown') {
+                themeBtn.textContent = '🤡';
+            } else if (currentTheme === 'light') {
+                themeBtn.textContent = '☀️';
+            }
+        }
+
+		function toggleTheme() {
+			const body = document.body;
+			const currentTheme = body.getAttribute('data-theme') || 'light';
+			
+			let newTheme;
+			if (currentTheme === 'light') {
+				newTheme = 'dark';
+			} else if (currentTheme === 'dark') {
+				newTheme = 'clown';
+			} else {
+				newTheme = 'light';
+			}
+			
+			body.setAttribute('data-theme', newTheme);
+			localStorage.setItem('theme', newTheme);
+			updateThemeIcon();
+		}
+
+		async function fetchAndUpdateUsernames() {
+			if (isLookingUpUsernames) {
+				return;
+			}
+			
+			// Skip if slow connection is checked
+			if (document.getElementById('slowConnection').checked) {
+				logToConsole("⚡ Skipping usernames - slow connection mode");
+				return;
+			}
+			
+			logToConsole("👤 Starting username lookups...");
+			isLookingUpUsernames = true;
+			
+			// Get all unique pubkeys from current feed that don't have display names yet
+			const pubkeysToFetch = [...new Set(currentFeed
+				.filter(note => !note.displayName) // Only fetch if we don't have it
+				.map(note => note.pubkey)
+				.filter(Boolean)
+			)];
+			
+			if (pubkeysToFetch.length === 0) {
+				isLookingUpUsernames = false;
+				return;
+			}
+			
+			logToConsole(`🔍 Looking up ${pubkeysToFetch.length} unique authors`);
+			
+			// Connect to relay to fetch profiles
+			const relay = new WebSocket('wss://relay.damus.io');
+			
+			relay.onopen = function() {
+				logToConsole("👤 Connected for profile lookups");
+				
+				// Request profiles (kind 0 events)
+				const profileRequest = [
+					"REQ",
+					"get-profiles",
+					{
+						"kinds": [0],
+						"authors": pubkeysToFetch,
+						"limit": pubkeysToFetch.length
+					}
+				];
+				
+				relay.send(JSON.stringify(profileRequest));
+			};
+			
+			relay.onmessage = function(event) {
+				const message = JSON.parse(event.data);
+				
+				if (message[0] === "EVENT" && message[2].kind === 0) {
+					const profileData = message[2];
+					const pubkey = profileData.pubkey;
+					
+					try {
+						const profile = JSON.parse(profileData.content);
+						const displayName = profile.display_name || profile.name || pubkey.slice(0, 8) + "...";
+						
+						// Validate avatar URL
+						let safeAvatarUrl = null;
+						if (profile.picture && typeof profile.picture === 'string') {
+							try {
+								const url = new URL(profile.picture);
+								if (url.protocol === 'https:' || url.protocol === 'http:') {
+									safeAvatarUrl = profile.picture;
+								}
+							} catch (e) {
+								// Invalid URL - ignore silently
+							}
+						}
+						
+						logToConsole(`👤 Found name: ${displayName} for ${pubkey.slice(0, 8)}...`);
+						
+						// UPDATE THE NOTES THEMSELVES with the validated data
+						currentFeed.forEach(note => {
+							if (note.pubkey === pubkey) {
+								note.displayName = displayName;
+								note.avatar = safeAvatarUrl; // Only set if valid
+							}
+						});
+						
+						// Re-display the feed to show the updated names
+						displayFeed(currentFeed, false);
+						
+					} catch (e) {
+						logToConsole("⚠ Failed to parse profile for " + pubkey.slice(0, 8));
+					}
+				}
+				
+				if (message[0] === "EOSE") {
+					logToConsole("✅ Done fetching profiles");
+					relay.close();
+					isLookingUpUsernames = false;
+				}
+			};
+			
+			relay.onerror = function(error) {
+				logToConsole("❌ Profile lookup failed: " + error);
+				relay.close();
+				isLookingUpUsernames = false;
+			};
+		}
+
+		function showDefaultFeedInfo() {
+			const container = document.getElementById('feedContainer');
+			const infoDiv = document.createElement('div');
+			infoDiv.style.cssText = 'background: #dbeafe; border: 1px solid #3b82f6; padding: 12px; margin-bottom: 16px; border-radius: 6px; font-size: 14px;';
+			
+			const strongText = document.createElement('strong');
+			strongText.textContent = "You're viewing a demo feed!";
+			
+			const br = document.createElement('br');
+			
+			const description = document.createTextNode('This shows recent notes from people followed by a Nostr vibecoder. Note: NOSTR is uncensored.  Use at your own risk, and be careful clicking links.');
+			
+			const learnBtn = document.createElement('button');
+			learnBtn.textContent = 'Learn More';
+			learnBtn.style.cssText = 'margin-left: 8px; padding: 4px 8px; border: none; background: #3b82f6; color: white; border-radius: 4px; cursor: pointer;';
+			learnBtn.onclick = openHelpModal;
+			
+			const dismissBtn = document.createElement('button');
+			dismissBtn.textContent = 'Dismiss';
+			dismissBtn.style.cssText = 'margin-left: 4px; padding: 4px 8px; border: none; background: #6b7280; color: white; border-radius: 4px; cursor: pointer;';
+			dismissBtn.onclick = function() { this.parentElement.remove(); };
+			
+			infoDiv.appendChild(strongText);
+			infoDiv.appendChild(br);
+			infoDiv.appendChild(description);
+			infoDiv.appendChild(learnBtn);
+			infoDiv.appendChild(dismissBtn);
+			
+			// Insert at the top of the feed container
+			container.insertBefore(infoDiv, container.firstChild);
+		}
+
+		function formatRelativeTime(timestamp) {
+			const now = Math.floor(Date.now() / 1000);
+			const diff = now - timestamp;
+			
+			if (diff < 60) return 'just now';
+			if (diff < 3600) return Math.floor(diff / 60) + ' minutes ago';
+			if (diff < 86400) return Math.floor(diff / 3600) + ' hours ago';
+			if (diff < 604800) return Math.floor(diff / 86400) + ' days ago';
+			return Math.floor(diff / 604800) + ' weeks ago';
+		}
+
+		function shortenLongStrings(text) {
+			// Look for long alphanumeric strings (20+ chars) that aren't already links
+			return text.replace(/\b[a-zA-Z0-9]{20,}\b/g, function(match) {
+				// Skip if it's already a known nostr identifier
+				if (match.startsWith('npub1') || match.startsWith('note1') || 
+					match.startsWith('nevent1') || match.startsWith('nprofile1')) {
+					return match; // Let existing regex handle these
+				}
+				
+				// Shorten other long strings
+				return match.slice(0, 12) + '...';
+			});
+		}
+
+		function loadProfileImage(imageUrl, authorElement, pubkey) {
+			// Validate URL first
+			try {
+				const url = new URL(imageUrl);
+				if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+					return; // Skip invalid protocols
+				}
+			} catch (e) {
+				return; // Skip invalid URLs
+			}
+			
+			// Create a temporary image to check size before displaying
+			const tempImg = new Image();
+			tempImg.crossOrigin = 'anonymous';
+			
+			tempImg.onload = function() {
+				// Estimate file size (rough approximation)
+				const canvas = document.createElement('canvas');
+				const ctx = canvas.getContext('2d');
+				canvas.width = this.naturalWidth;
+				canvas.height = this.naturalHeight;
+				ctx.drawImage(this, 0, 0);
+				
+				// Get data URL and estimate size
+				const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+				const estimatedSize = dataUrl.length * 0.75; // Rough byte estimate
+				
+				if (estimatedSize < 200000) { // 200KB limit
+					// Create avatar image
+					const avatar = document.createElement('img');
+					avatar.src = imageUrl;
+					avatar.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; margin-right: 8px; vertical-align: middle;';
+					avatar.alt = 'Profile photo';
+					
+					// Insert before the name text
+					authorElement.insertBefore(avatar, authorElement.firstChild);
+				}
+			};
+			
+			tempImg.onerror = function() {
+				// Fail silently - CORS errors are expected in browser environment
+			};
+			
+			tempImg.src = imageUrl;
+		}
+
+		function escapeHtml(text) {
+			const div = document.createElement('div');
+			div.textContent = text;
+			let html = div.innerHTML;
+			
+			// Convert nostr identifiers to short links
+			html = html.replace(/(nevent1[a-zA-Z0-9]+)/g, '&nbsp;<a href="https://njump.me/$1" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); text-decoration: underline;">nevent1...</a>');
+			html = html.replace(/(note1[a-zA-Z0-9]+)/g, '&nbsp;<a href="https://njump.me/$1" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); text-decoration: underline;">note1...</a>');
+			html = html.replace(/(npub1[a-zA-Z0-9]+)/g, '&nbsp;<a href="https://njump.me/$1" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); text-decoration: underline;">npub1...</a>');
+			html = html.replace(/(nprofile1[a-zA-Z0-9]+)/g, '&nbsp;<a href="https://njump.me/$1" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); text-decoration: underline;">nprofile1...</a>');
+			
+			html = shortenLongStrings(html);
+			
+			return html;
+		}
+
+        function setLoading(loading) {
+            isLoading = loading;
+            const container = document.getElementById('feedContainer');
+            
+            if (loading) {
+                container.innerHTML = '<div class="loading">Loading notes...</div>';
+            }
+        }
+
+		function showError(message) {
+			const container = document.getElementById('feedContainer');
+			
+			const errorDiv = document.createElement('div');
+			errorDiv.className = 'error';
+			errorDiv.textContent = message; // Safe - automatically escaped
+			
+			container.innerHTML = ''; // Clear container
+			container.appendChild(errorDiv);
+		}
+
+        // Handle Enter key in input
+        document.getElementById('npubInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                loadFeed();
+            }
+        });
+
+        // Close modal when clicking outside
+        window.addEventListener('click', function(event) {
+            const modal = document.getElementById('settingsModal');
+            if (event.target === modal) {
+                closeSettings();
+            }
+        });
+		
+		// Handle slow connection checkbox changes
+		document.getElementById('slowConnection').addEventListener('change', function() {
+			const consoleBanner = document.getElementById('consoleBanner');
+			
+			if (this.checked) {
+				logToConsole("Slow connection mode enabled");
+				consoleBanner.classList.remove('show');
+				showMessageBanner("Slow connection mode enabled.  To save bandwidth, fewer notes, no avatars are fetched, and usernames not resolved", 6000);
+				
+			} else {
+				consoleBanner.classList.add('show');
+				
+				showMessageBanner("Slow connection mode disabled", 3000);
+			}
+		});
+
+		// Handle selector change
+		document.getElementById('savedSelector').addEventListener('change', function() {
+			if (this.value) {
+				document.getElementById('npubInput').value = this.value;
+			}
+		});
+
+		// Handle close button click
+		document.addEventListener('DOMContentLoaded', function() {
+			document.getElementById('bannerClose').addEventListener('click', hideBanner);
+		});
+
+		// Handle sort order change
+		document.getElementById('sortOrder').addEventListener('change', function() {
+			logToConsole("Sort order changed to: " + this.value);
+			if (currentFeed.length > 0) {
+				logToConsole("Re-displaying " + currentFeed.length + " notes");
+				displayFeed(currentFeed, false);
+			} else {
+				logToConsole("No notes to re-sort");
+			}
+		});
+    </script>
+</body>
+</html>
