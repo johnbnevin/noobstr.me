@@ -1,5 +1,5 @@
 # noobstr.me
-Noobstr.me - An onboarding website for NOSTR.  Just Go!
+Noobstr.me - An onboarding website / read-onlly client for NOSTR.  Just Go!
 
 Bugs that still exist:
 - SSL pending
