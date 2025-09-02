@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Noobstr - Simple Nostr Client</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='90' font-size='90'>🤙</text></svg>">
-    <style>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' wss: ws: https:;">
+	<style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root { --bg-color: #ffffff; --text-color: #333333; --accent-orange: #ff6b35; --accent-purple: #7c3aed; --border-color: #e5e7eb; --card-bg: #f9fafb; --input-bg: #ffffff; --button-hover: #f3f4f6; }
         #sortOrder { flex-shrink: 0; min-width: 120px; }
@@ -17,7 +18,8 @@
         input { flex: 1; }
         button { cursor: pointer; background-color: var(--input-bg); border: 1px solid var(--border-color); transition: background-color 0.2s; min-height: 44px; }
         button:hover { background-color: var(--button-hover); }
-        .top-bar { position: sticky; top: 0; background-color: var(--bg-color); border-bottom: 1px solid var(--border-color); padding: 8px 12px; z-index: 100; }
+		.settings-item button:last-child { background-color: #ef4444 !important; color: white !important; font-size: 12px !important; padding: 4px 8px !important; min-width: 60px !important; min-height: auto !important; }
+		.top-bar { position: sticky; top: 0; background-color: var(--bg-color); border-bottom: 1px solid var(--border-color); padding: 8px 12px; z-index: 100; }
         .logo { font-size: 24px; font-weight: bold; color: var(--accent-orange); }
         .input-group { display: flex; gap: 8px; width: 100%; margin-bottom: 8px; }
         .icon-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 16px; border-radius: 4px; }
@@ -42,8 +44,9 @@
         .modal h3 { margin-bottom: 16px; color: var(--accent-purple); }
         .settings-section { margin-bottom: 20px; }
         .settings-section h4 { margin-bottom: 8px; font-size: 14px; color: var(--text-color); }
-        .settings-item { display: flex; gap: 8px; margin-bottom: 8px; }
         .settings-item input { flex: 1; }
+		.settings-item { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+		@media (max-width: 480px) { .settings-item { flex-direction: column; } .settings-item input { margin-bottom: 4px; } .settings-item button { align-self: flex-start; min-width: 80px; } .settings-item button[onclick*="remove"] { min-width: 60px; } }
 		.close { position: absolute; right: 10px; top: 10px; font-size: 28px; cursor: pointer; }
 		.empty-state { text-align: center; padding: 40px 20px; color: #6b7280; }
 		.message-banner { display: none; background-color: var(--accent-orange); color: white; padding: 3px 15px; position: relative; border-bottom: 1px solid var(--border-color); font-size: 12px; line-height: 1.2; }
@@ -60,6 +63,9 @@
 		.console-header { padding: 4px 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background-color: var(--border-color); }
 		.console-content { display: none; max-height: 100px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 		.console-content.expanded { display: block; }
+		.lightbox { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 3000; cursor: pointer; }
+		.lightbox img { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); max-width: 90vw; max-height: 90vh; cursor: default; }
+		.lightbox-close { position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; cursor: pointer; user-select: none; }
     </style>
 </head>
 
@@ -110,16 +116,17 @@
 	
         <div id="feedContainer">
             <div class="empty-state">
-                <h3>Welcome to Noobstr!</h3>
+                <h3>Welcome, Noobstr!</h3>
                 <p>Click the 'Just Go!' button to see what's on NOSTR!</p>
-				<p>Enter an npub to see their follows' notes, or enter a relay URL to see notes from that relay.</p>
+				<p>Enter an npub to see notes from their followers, or enter a relay URL to see notes from that relay.</p>
             </div>
         </div>
     </div>
 
     <div class="bottom-bar">
         <div class="bottom-links">
-            <span>Ready to go Full Nostr? <a href="https://nostr.how" target="_blank" rel="noopener noreferrer">Comment, Reply, Zap Bitcoin!</a> | <a href="https://grownostr.org/get-started.html">More Info</a></span>
+            <span>Ready for the full Nostr experience?  Learn how to post, reply, and zap Bitcoin now:<br>
+			<a href="https://nostr.how" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); font-weight: bold;">Nostr.how</a> | <a href="https://nostr.com/ " target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); font-weight: bold;">Nostr.com</a> | <a href="https://grownostr.org/get-started.html" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); font-weight: bold;">GrowNostr.org</a></span>
         </div>
         <div class="bottom-links">
             <span><a href="https://coinos.io/pay/jbnevin">Vibecoded with ♥</a></span>
@@ -140,7 +147,7 @@
                 <div class="settings-item">
                     <input type="text" id="newNpubName" placeholder="Name">
                     <input type="text" id="newNpubValue" placeholder="npub...">
-                    <button onclick="addNpub()">Add</button>
+                    <button onclick="addNpub()">Add New Npub</button>
                 </div>
             </div>
 
@@ -150,19 +157,19 @@
 							<div class="settings-item">
 								<input type="text" id="newRelayName" placeholder="Name">
 								<input type="text" id="newRelayValue" placeholder="wss://..." value="wss://">
-								<button onclick="addRelay()">Add</button>
+								<button onclick="addRelay()">Add New Relay</button>
 							</div>
 						</div>
 
 						<div class="settings-section">
 							<h4>Need Help Finding Npubs & Relays?</h4>
 							<p style="font-size: 13px; color: #6b7280; margin-bottom: 12px; line-height: 1.4;">
-								<strong>Npubs:</strong> Find NOSTRiches who have good follow lists at <a href="https://nostr.directory" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange);">nostr.directory</a> <br>
-								<strong>Relays:</strong> Find a NOSTR public relays to browse at <a href="https://nostr.watch" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange);">nostr.watch</a>
+								<strong>Npubs:</strong> Find NOSTRiches with good follow lists at <a href="https://nostr.directory" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange);">nostr.directory</a> <br>
+								<strong>Relays:</strong> Find NOSTR public relays at <a href="https://nostr.watch" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange);">nostr.watch</a>
 							</p>
 							<p style="font-size: 13px; color: #6b7280; margin-bottom: 8px;">
-								Ready for the full Nostr experience? 
-								<a href="https://nostr.how" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); font-weight: bold;">Learn how to post, reply, and zap Bitcoin</a> | <a href="https://grownostr.org/get-started.html">More Info</a>
+								Ready for the full Nostr experience?  Learn how to post, reply, and zap Bitcoin now:<br>
+								<a href="https://nostr.how" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); font-weight: bold;">Nostr.how</a> | <a href="https://nostr.com/ " target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); font-weight: bold;">Nostr.com</a> | <a href="https://grownostr.org/get-started.html" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); font-weight: bold;">GrowNostr.org</a>
 							</p>
 						</div>
 					</div>
@@ -201,29 +208,38 @@
         let isLoading = false;
 		let isLookingUpUsernames = false;
 		let bannerTimeout = null;
-		
-		// Console logging system
+		let imageProcessingQueue = [];
+		let isProcessingImages = false;
 		let consoleEntries = [];
-		const MAX_CONSOLE_ENTRIES = 1000;
+		const MAX_CONSOLE_ENTRIES = 2500;
+		
+		// Fallback relays for npub lookups (in order of preference)
+		const FALLBACK_RELAYS = [
+			'wss://relay.nostr.band',
+			'wss://yakihonne.com',
+			'wss://nos.lol',
+			'wss://coracle.social'
+		];
 
 		function logToConsole(message, type = 'log') {
-			if (console[type]) {
-				console[type](message);
-			} else {
-				console.log(message);
-			}
+			const sanitizedMessage = typeof message === 'string' ? 
+				message.substring(0, 1000).replace(/[<>&"']/g, '') : 
+				String(message).substring(0, 1000);
 			
-			// Check if slow connection is enabled - if so, don't show console
-			const slowConnection = document.getElementById('slowConnection');
-			if (slowConnection && slowConnection.checked) {
-				return;
+			if (console[type]) {
+				console[type](sanitizedMessage);
+			} else {
+				console.log(sanitizedMessage);
 			}
 			
 			const timestamp = new Date().toLocaleTimeString();
-			consoleEntries.unshift({ message, type, timestamp });
 			
+			// Add to beginning of array with sanitized message
+			consoleEntries.unshift({ message: sanitizedMessage, type, timestamp });
+			
+			// Limit array size - but use splice for better performance
 			if (consoleEntries.length > MAX_CONSOLE_ENTRIES) {
-				consoleEntries = consoleEntries.slice(0, MAX_CONSOLE_ENTRIES);
+				consoleEntries.splice(MAX_CONSOLE_ENTRIES);
 			}
 			
 			// Show the consolebanner and update latest message
@@ -234,12 +250,17 @@
 				consoleBanner.classList.add('show');
 			}
 			
-			latestMessage.textContent = message;
+			// Truncate very long messages in the banner to prevent UI issues
+			const truncatedMessage = sanitizedMessage.length > 100 ? sanitizedMessage.slice(0, 100) + '...' : sanitizedMessage;
+			latestMessage.textContent = truncatedMessage;
 			
-			// Update full log if expanded
-			updateConsoleContent();
+			// Only update full log if it's currently expanded (performance improvement)
+			const consoleContent = document.getElementById('consoleContent');
+			if (consoleContent && consoleContent.classList.contains('expanded')) {
+				updateConsoleContent();
+			}
 		}
-
+		
 		function toggleConsoleLog() {
 			const consoleContent = document.getElementById('consoleContent');
 			const expandIcon = document.getElementById('expandIcon');
@@ -258,30 +279,215 @@
 			const consoleContent = document.getElementById('consoleContent');
 			if (!consoleContent.classList.contains('expanded')) return;
 			
-			consoleContent.innerHTML = '';
-			consoleEntries.forEach(entry => {
-				const div = document.createElement('div');
-				div.className = `console-entry ${entry.type || 'log'}`;
+			// Clear existing content
+			while (consoleContent.firstChild) {
+				consoleContent.removeChild(consoleContent.firstChild);
+			}
+			
+			// Initial batch size - start small
+			const initialBatchSize = 50;
+			let currentDisplayCount = 0;
+			
+			// Create container for entries
+			const entriesContainer = document.createElement('div');
+			consoleContent.appendChild(entriesContainer);
+			
+			// Function to load more entries
+			const loadMoreEntries = () => {
+				const fragment = document.createDocumentFragment();
+				const endIndex = Math.min(currentDisplayCount + initialBatchSize, consoleEntries.length);
 				
-				const timeSpan = document.createElement('span');
-				timeSpan.style.color = '#6b7280';
-				timeSpan.textContent = `[${entry.timestamp}] `;
+				for (let i = currentDisplayCount; i < endIndex; i++) {
+					const entry = consoleEntries[i];
+					const div = document.createElement('div');
+					div.className = `console-entry ${entry.type || 'log'}`;
+					
+					const timeSpan = document.createElement('span');
+					timeSpan.style.color = '#6b7280';
+					timeSpan.textContent = `[${entry.timestamp}] `;
+					
+					const messageSpan = document.createElement('span');
+					const truncatedMessage = entry.message.length > 200 ? entry.message.slice(0, 200) + '...' : entry.message;
+					messageSpan.textContent = truncatedMessage;
+					
+					div.appendChild(timeSpan);
+					div.appendChild(messageSpan);
+					fragment.appendChild(div);
+				}
 				
-				const messageSpan = document.createElement('span');
-				messageSpan.textContent = entry.message;
+				entriesContainer.appendChild(fragment);
+				currentDisplayCount = endIndex;
 				
-				div.appendChild(timeSpan);
-				div.appendChild(messageSpan);
-				consoleContent.appendChild(div);
-			});
+				// Remove load more button if we've shown everything
+				const loadMoreBtn = consoleContent.querySelector('.load-more-btn');
+				if (loadMoreBtn && currentDisplayCount >= consoleEntries.length) {
+					loadMoreBtn.remove();
+				}
+			};
+			
+			// Load initial batch
+			loadMoreEntries();
+			
+			// Add "Load More" button if there are more entries
+			if (currentDisplayCount < consoleEntries.length) {
+				const loadMoreBtn = document.createElement('button');
+				loadMoreBtn.className = 'load-more-btn';
+				loadMoreBtn.textContent = `Load ${Math.min(initialBatchSize, consoleEntries.length - currentDisplayCount)} more entries (${consoleEntries.length - currentDisplayCount} remaining)`;
+				loadMoreBtn.style.cssText = 'width: 100%; padding: 8px; margin: 4px 0; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; font-size: 12px;';
+				
+				loadMoreBtn.addEventListener('click', () => {
+					loadMoreEntries();
+					// Update button text
+					if (currentDisplayCount < consoleEntries.length) {
+						loadMoreBtn.textContent = `Load ${Math.min(initialBatchSize, consoleEntries.length - currentDisplayCount)} more entries (${consoleEntries.length - currentDisplayCount} remaining)`;
+					}
+				});
+				
+				consoleContent.appendChild(loadMoreBtn);
+			}
 		}
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            loadSettings();
-            updateSavedSelector();
+		document.addEventListener('DOMContentLoaded', function() {
+			// NEW: Validate elements exist before proceeding
+			const npubInput = document.getElementById('npubInput');
+			const savedSelector = document.getElementById('savedSelector');
+			const slowConnection = document.getElementById('slowConnection');
+			
+			if (!npubInput || !savedSelector || !slowConnection) {
+				console.error('Required DOM elements not found');
+				return;
+			}
+			
+			loadSettings();
+			updateSavedSelector();
 			logToConsole('Noobstr initialized! 🤙');
-        });
+		});
+
+		// Get relay information according to NIP-11
+		async function getRelayInfo(relayUrl) {
+			try {
+				// Convert WebSocket URL to HTTP for NIP-11 request
+				const httpUrl = relayUrl.replace('wss://', 'https://').replace('ws://', 'http://');
+				
+				logToConsole(`📡 Checking relay info: ${httpUrl}`);
+				
+				// Set up timeout
+				const controller = new AbortController();
+				const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+				
+				const response = await fetch(httpUrl, {
+					headers: { 
+						'Accept': 'application/nostr+json',
+						'User-Agent': 'Noobstr/1.1'
+					},
+					signal: controller.signal
+				});
+				
+				clearTimeout(timeoutId);
+				
+				if (!response.ok) {
+					logToConsole(`⚠️ Relay ${relayUrl} - no info document (${response.status})`, 'warn');
+					return null;
+				}
+				
+				const info = await response.json();
+				logToConsole(`✅ Got relay info for ${relayUrl}`, 'success');
+				return info;
+				
+			} catch (error) {
+				if (error.name === 'AbortError') {
+					logToConsole(`⏰ Relay info timeout for ${relayUrl}`, 'warn');
+				} else {
+					logToConsole(`❌ Failed to get relay info for ${relayUrl}: ${error.message}`, 'error');
+				}
+				return null;
+			}
+		}
+
+		function validateEventFormat(event) {
+			// Check if event exists and is an object
+			if (!event || typeof event !== 'object') {
+				logToConsole("❌ Invalid event: not an object", 'error');
+				return false;
+			}
+			
+			// Check required fields exist
+			const requiredFields = ['id', 'pubkey', 'created_at', 'kind', 'tags', 'content', 'sig'];
+			for (const field of requiredFields) {
+				if (!event.hasOwnProperty(field)) {
+					logToConsole(`❌ Invalid event: missing field '${field}'`, 'error');
+					return false;
+				}
+			}
+			
+			// Basic format checks
+			if (typeof event.id !== 'string' || event.id.length !== 64) {
+				logToConsole("❌ Invalid event: id should be 64 character hex string", 'error');
+				return false;
+			}
+			
+			if (typeof event.pubkey !== 'string' || event.pubkey.length !== 64) {
+				logToConsole("❌ Invalid event: pubkey should be 64 character hex string", 'error');
+				return false;
+			}
+			
+			if (!Number.isInteger(event.created_at) || event.created_at <= 0) {
+				logToConsole("❌ Invalid event: created_at should be positive integer", 'error');
+				return false;
+			}
+			
+			if (!Number.isInteger(event.kind) || event.kind < 0 || event.kind > 65535) {
+				logToConsole("❌ Invalid event: kind should be integer 0-65535", 'error');
+				return false;
+			}
+			
+			if (!Array.isArray(event.tags)) {
+				logToConsole("❌ Invalid event: tags should be an array", 'error');
+				return false;
+			}
+			
+			// Reject overly long content to prevent memory issues
+			if (event.content.length > 50000) {
+				logToConsole("⛔ Invalid event: content too long (" + event.content.length + " chars)", 'error');
+				return false;
+			}
+			
+			if (typeof event.content !== 'string') {
+				logToConsole("❌ Invalid event: content should be string", 'error');
+				return false;
+			}
+			
+			if (typeof event.sig !== 'string' || event.sig.length !== 128) {
+				logToConsole("❌ Invalid event: sig should be 128 character hex string", 'error');
+				return false;
+			}
+			
+			// Check hex format for id, pubkey, and sig
+			const hexRegex = /^[a-f0-9]+$/i;
+			if (!hexRegex.test(event.id)) {
+				logToConsole("❌ Invalid event: id contains non-hex characters", 'error');
+				return false;
+			}
+			
+			if (!hexRegex.test(event.pubkey)) {
+				logToConsole("❌ Invalid event: pubkey contains non-hex characters", 'error');
+				return false;
+			}
+			
+			if (!hexRegex.test(event.sig)) {
+				logToConsole("❌ Invalid event: sig contains non-hex characters", 'error');
+				return false;
+			}
+			
+			// NEW: Check for unsafe URLs in content
+			if (containsUnsafeUrls(event.content)) {
+				logToConsole("❌ Invalid event: contains unsafe or malformed URLs", 'error');
+				return false;
+			}
+			
+			logToConsole("✅ Event format validation passed", 'success');
+			return true;
+		}
 
 		function npubToPubkey(npub) {
 			if (!npub.startsWith('npub')) {
@@ -362,20 +568,65 @@
 			localStorage.setItem('theme', newTheme);
 		}
 
-        // Load saved theme
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        document.body.setAttribute('data-theme', savedTheme);
+		// Load saved theme
+		const savedTheme = localStorage.getItem('theme') || 'light';
+		// NEW: Validate theme value
+		const validThemes = ['light', 'dark', 'clown'];
+		const safeTheme = validThemes.includes(savedTheme) ? savedTheme : 'light';
+		document.body.setAttribute('data-theme', safeTheme);
 
+		// Handle close button click
 		document.addEventListener('DOMContentLoaded', function() {
-			updateThemeIcon();
+			const bannerClose = document.getElementById('bannerClose');
+			// NEW: Check element exists before adding listener
+			if (bannerClose) {
+				bannerClose.addEventListener('click', hideBanner);
+			}
 		});
 
-        // Settings management
-        function loadSettings() {
-            const npubs = JSON.parse(localStorage.getItem('savedNpubs') || '[]');
-            const relays = JSON.parse(localStorage.getItem('savedRelays') || '[]');
-            updateSettingsDisplay();
-        }
+		function loadSettings() {
+			// Validate npubs from localStorage
+			let npubs = [];
+			try {
+				const savedNpubs = JSON.parse(localStorage.getItem('savedNpubs') || '[]');
+				if (Array.isArray(savedNpubs)) {
+					npubs = savedNpubs.filter(item => 
+						item && 
+						typeof item === 'object' &&  // NEW: Ensure item is an object
+						typeof item.name === 'string' && 
+						typeof item.value === 'string' && 
+						item.value.startsWith('npub1') &&
+						item.name.length < 100 &&  // NEW: Limit name length
+						item.value.length === 63    // NEW: Validate npub length
+					);
+				}
+			} catch (e) {
+				console.log('Invalid npubs data in localStorage, clearing');
+				localStorage.removeItem('savedNpubs');
+			}
+			
+			// Validate relays from localStorage  
+			let relays = [];
+			try {
+				const savedRelays = JSON.parse(localStorage.getItem('savedRelays') || '[]');
+				if (Array.isArray(savedRelays)) {
+					relays = savedRelays.filter(item => 
+						item && 
+						typeof item === 'object' &&  // NEW: Ensure item is an object
+						typeof item.name === 'string' && 
+						typeof item.value === 'string' && 
+						(item.value.startsWith('wss://') || item.value.startsWith('ws://')) &&
+						item.name.length < 100 &&  // NEW: Limit name length
+						item.value.length < 500     // NEW: Limit URL length
+					);
+				}
+			} catch (e) {
+				console.log('Invalid relays data in localStorage, clearing');
+				localStorage.removeItem('savedRelays');
+			}
+			
+			updateSettingsDisplay();
+		}
 
         function saveSettings() {
             updateSavedSelector();
@@ -387,7 +638,15 @@
 			const relays = JSON.parse(localStorage.getItem('savedRelays') || '[]');
 			
 			// Clear selector
-			selector.innerHTML = '<option value="">Select saved...</option>';
+			while (selector.firstChild) {
+				selector.removeChild(selector.firstChild);
+			}
+
+			// Add the default option
+			const defaultOption = document.createElement('option');
+			defaultOption.value = '';
+			defaultOption.textContent = 'Select saved...';
+			selector.appendChild(defaultOption);
 			
 			// Add demo option
 			const demoOption = document.createElement('option');
@@ -429,13 +688,16 @@
 		function updateSettingsDisplay() {
 			const npubs = JSON.parse(localStorage.getItem('savedNpubs') || '[]');
 			const relays = JSON.parse(localStorage.getItem('savedRelays') || '[]');
-			
 			const npubsList = document.getElementById('npubsList');
 			const relaysList = document.getElementById('relaysList');
 			
-			// Clear existing content
-			npubsList.innerHTML = '';
-			relaysList.innerHTML = '';
+			// Clear existing content using DOM methods
+			while (npubsList.firstChild) {
+				npubsList.removeChild(npubsList.firstChild);
+			}
+			while (relaysList.firstChild) {
+				relaysList.removeChild(relaysList.firstChild);
+			}
 			
 			// Build npubs list safely
 			npubs.forEach((item, index) => {
@@ -453,7 +715,7 @@
 				valueInput.readOnly = true;
 				
 				const removeBtn = document.createElement('button');
-				removeBtn.textContent = 'Remove';
+				removeBtn.textContent = 'Remove Npub';
 				removeBtn.onclick = () => removeNpub(index);
 				
 				div.appendChild(nameInput);
@@ -478,7 +740,7 @@
 				valueInput.readOnly = true;
 				
 				const removeBtn = document.createElement('button');
-				removeBtn.textContent = 'Remove';
+				removeBtn.textContent = 'Remove Relay';
 				removeBtn.onclick = () => removeRelay(index);
 				
 				div.appendChild(nameInput);
@@ -516,65 +778,426 @@
 			}
 		}
 
-		function addNpub() {
-					const name = document.getElementById('newNpubName').value.trim();
-					const value = document.getElementById('newNpubValue').value.trim();
-					
-					if (!name && !value) {
-						showMessageBanner("Please enter both a name and npub", 3000);
-						return;
-					}
-					if (!name) {
-						showMessageBanner("Please enter a name for this npub", 3000);
-						return;
-					}
-					if (!value) {
-						showMessageBanner("Please enter an npub value", 3000);
-						return;
-					}
-					
-					const npubs = JSON.parse(localStorage.getItem('savedNpubs') || '[]');
-					npubs.push({ name, value });
-					localStorage.setItem('savedNpubs', JSON.stringify(npubs));
-					
-					document.getElementById('newNpubName').value = '';
-					document.getElementById('newNpubValue').value = '';
-					
-					updateSettingsDisplay();
-					updateSavedSelector();
-					
-					showMessageBanner(`Saved npub: ${name}`, 2000);
+		function processImagesInContent(content, noteElement) {
+			// Skip if slow connection mode is enabled
+			if (document.getElementById('slowConnection').checked) {
+				return content;
+			}
+			
+			// Check if this noteElement already has images processed
+			if (noteElement.dataset.imagesProcessed === 'true') {
+				return content;
+			}
+			
+			// Look for image URLs in the content
+			const imageUrlRegex = /(https:\/\/[^.\s]*\.nostr\.build\/[^\s]+\.(jpg|jpeg|png|gif|webp))/gi;
+			const imageUrls = content.match(imageUrlRegex);
+			
+			if (imageUrls) {
+				// Mark this note as having images processed
+				noteElement.dataset.imagesProcessed = 'true';
+				
+				// Add to queue
+				imageUrls.forEach(url => {
+					imageProcessingQueue.push({ url, noteElement });
+					logToConsole(`Added image to queue: ${url.slice(-20)}...`);
+				});
+				
+				// Start processing if not already running
+				if (!isProcessingImages) {
+					processImageQueue();
 				}
+			}
+			
+			return content;
+		}
+		
+		async function processImageQueue() {
+			isProcessingImages = true;
+			
+			while (imageProcessingQueue.length > 0) {
+				const { url, noteElement } = imageProcessingQueue.shift();
+				
+				try {
+					await checkAndRenderImage(url, noteElement);
+					// Small delay to prevent overwhelming the browser
+					await new Promise(resolve => setTimeout(resolve, 100));
+				} catch (error) {
+					logToConsole(`Failed to process image: ${error.message}`, 'error');
+				}
+			}
+			
+			isProcessingImages = false;
+		}
 
-				function addRelay() {
-							const name = document.getElementById('newRelayName').value.trim();
-							const value = document.getElementById('newRelayValue').value.trim();
-							
-							if (!name && !value) {
-								showMessageBanner("Please enter both a name and relay URL", 3000);
-								return;
-							}
-							if (!name) {
-								showMessageBanner("Please enter a name for this relay", 3000);
-								return;
-							}
-							if (!value) {
-								showMessageBanner("Please enter a relay URL", 3000);
-								return;
-							}
-							
-							const relays = JSON.parse(localStorage.getItem('savedRelays') || '[]');
-							relays.push({ name, value });
-							localStorage.setItem('savedRelays', JSON.stringify(relays));
-							
-							document.getElementById('newRelayName').value = '';
-							document.getElementById('newRelayValue').value = '';
-							
-							updateSettingsDisplay();
-							updateSavedSelector();
-							
-							showMessageBanner(`Saved relay: ${name}`, 2000);
-						}
+		async function checkAndRenderImage(imageUrl, noteElement) {
+			try {
+				// NEW: Basic URL validation
+				try {
+					const validUrl = new URL(imageUrl);
+					if (validUrl.protocol !== 'https:' && validUrl.protocol !== 'http:') {
+						return; // Skip unsafe protocols silently
+					}
+				} catch (e) {
+					return; // Skip malformed URLs silently
+				}
+				
+				logToConsole(`Checking image: ${imageUrl.slice(-20)}...`);
+				
+				// Head request to check file size
+				const response = await fetch(imageUrl, { method: 'HEAD' });
+				const contentLength = response.headers.get('content-length');
+				
+				if (contentLength && parseInt(contentLength) > 300000) {
+					logToConsole(`Image too large: ${Math.round(contentLength/1000)}kb`, 'warn');
+					return;
+				}
+				
+				// Create image element with timeout and error handling
+				const img = document.createElement('img');
+				img.style.cssText = `
+					max-width: 300px; 
+					max-height: 200px; 
+					margin: 8px 0; 
+					border-radius: 4px; 
+					cursor: pointer;
+					display: block;
+				`;
+				
+				// Set up timeout to cancel slow loading images
+				const loadTimeout = setTimeout(() => {
+					img.src = ''; // Cancel loading
+					img.remove(); // Remove from DOM
+					logToConsole(`Image load timeout: ${imageUrl.slice(-20)}...`, 'warn');
+				}, 1000); // 1 second timeout
+				
+				img.onload = () => {
+					clearTimeout(loadTimeout);
+					logToConsole(`Image rendered: ${imageUrl.slice(-20)}.`, 'success');
+				};
+				
+				img.onerror = () => {
+					clearTimeout(loadTimeout);
+					img.remove(); // Remove broken image from DOM
+					logToConsole(`Image not loaded: ${imageUrl.slice(-20)}...`, 'error');
+				};
+				
+				img.onclick = () => openLightbox(imageUrl);
+				
+				// Start loading after setting up handlers
+				img.src = imageUrl;
+				noteElement.appendChild(img);
+				
+			} catch (error) {
+				logToConsole(`Failed to check image: ${error.message}`, 'error');
+			}
+		}
+
+		function openLightbox(imageUrl) {
+			// Validate image URL before opening lightbox
+			try {
+				const url = new URL(imageUrl);
+				if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+					return; // Skip unsafe protocols
+				}
+			} catch (e) {
+				return; // Skip malformed URLs
+			}
+			
+			const lightbox = document.createElement('div');
+			lightbox.className = 'lightbox';
+			
+			const img = document.createElement('img');
+			img.src = imageUrl;
+			img.onclick = (e) => e.stopPropagation(); // Prevent closing when clicking image
+			
+			const closeBtn = document.createElement('span');
+			closeBtn.className = 'lightbox-close';
+			closeBtn.innerHTML = '&times;';
+			
+			// Create the escape handler function
+			const escapeHandler = (e) => {
+				if (e.key === 'Escape') {
+					closeLightbox(lightbox);
+				}
+			};
+			
+			// Store the handler so we can remove it later
+			lightbox.escapeHandler = escapeHandler;
+			
+			// Create a unified close function that always cleans up properly
+			const closeLightboxSafely = () => {
+				closeLightbox(lightbox);
+			};
+			
+			// Assign the same cleanup function to all close triggers
+			closeBtn.onclick = closeLightboxSafely;
+			lightbox.onclick = closeLightboxSafely;
+			
+			lightbox.appendChild(img);
+			lightbox.appendChild(closeBtn);
+			
+			document.body.appendChild(lightbox);
+			lightbox.style.display = 'block';
+			
+			// Add escape key listener
+			document.addEventListener('keydown', escapeHandler);
+		}
+
+		function closeLightbox(lightbox) {
+			// Remove the escape key listener to prevent memory leak
+			if (lightbox.escapeHandler) {
+				document.removeEventListener('keydown', lightbox.escapeHandler);
+			}
+			
+			lightbox.style.display = 'none';
+			document.body.removeChild(lightbox);
+		}
+
+		function containsUnsafeUrls(content) {
+			// Define allowed protocols - only very common, safe ones
+			const SAFE_PROTOCOLS = new Set([
+				'http:', 'https:', 'ws:', 'wss:', 
+				'ftp:', 'ftps:', 'mailto:', 'tel:', 'sms:',
+				'nostr:'  // Add nostr protocol as safe
+			]);
+			
+			// More comprehensive URL regex
+			const urlRegex = /(https?:\/\/[^\s<>"\[\]{}|\\^`]+)|([a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^\s<>"\[\]{}|\\^`]+)|([a-zA-Z][a-zA-Z0-9+.-]*:[^\s<>"\[\]{}|\\^`\s]+)/gi;
+			
+			const urls = content.match(urlRegex);
+			
+			if (!urls) {
+				return false; // No URLs found, content is safe
+			}
+			
+			logToConsole(`Checking ${urls.length} URLs in note for safety`);
+			
+			for (const urlString of urls) {
+				try {
+					// Handle special cases that don't need URL constructor
+					if (urlString.startsWith('mailto:') || 
+						urlString.startsWith('tel:') || 
+						urlString.startsWith('sms:') ||
+						urlString.startsWith('nostr:')) {
+						continue; // These are safe
+					}
+					
+					const url = new URL(urlString);
+					
+					if (!SAFE_PROTOCOLS.has(url.protocol)) {
+						logToConsole(`Unsafe protocol detected: ${url.protocol} in URL: ${urlString.slice(0, 50)}...`, 'warn');
+						return true; // Found unsafe URL
+					}
+					
+					// Additional safety checks for dangerous protocols
+					if (url.protocol === 'javascript:' || 
+						url.protocol === 'data:' || 
+						url.protocol === 'file:' || 
+						url.protocol === 'blob:' ||
+						url.protocol === 'vbscript:') {
+						logToConsole(`Potentially malicious protocol blocked: ${url.protocol}`, 'warn');
+						return true;
+					}
+					
+				} catch (error) {
+					// If URL constructor fails, it's malformed
+					logToConsole(`Malformed URL detected: ${urlString.slice(0, 50)}...`, 'warn');
+					return true;
+				}
+			}
+			
+			logToConsole(`All URLs in note are safe`, 'success');
+			return false; // All URLs are safe
+		}
+
+		// Replace all URLs with pretty shortened versions based on content type
+		function prettifyAllLinks(text) {
+			const urlRegex = /(https?:\/\/[^\s]+)/gi;
+			
+			return text.replace(urlRegex, function(fullUrl) {
+				try {
+					const urlObj = new URL(fullUrl);
+					
+					// SECURITY: Only allow safe protocols
+					if (urlObj.protocol !== 'https:' && urlObj.protocol !== 'http:') {
+						logToConsole(`Blocked unsafe URL protocol: ${urlObj.protocol}`, 'warn');
+						return fullUrl; // Return as plain text, don't make it a link
+					}
+					
+					const domain = urlObj.hostname.replace(/^www\./, '');
+					const path = urlObj.pathname.toLowerCase();
+					const searchParams = urlObj.search.toLowerCase();
+					
+					let linkType = 'web'; // default
+					
+					// Video platforms
+					if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
+						linkType = 'video';
+					} else if (domain.includes('rumble.com') || domain.includes('vimeo.com') || domain.includes('twitch.tv')) {
+						linkType = 'video';
+					} else if (domain.includes('tiktok.com') || domain.includes('instagram.com') && path.includes('/reel')) {
+						linkType = 'video';
+					}
+					
+					// Music platforms
+					else if (domain.includes('spotify.com') || domain.includes('tidal.com') || domain.includes('apple.com') && path.includes('music')) {
+						linkType = 'music';
+					} else if (domain.includes('soundcloud.com') || domain.includes('bandcamp.com')) {
+						linkType = 'music';
+					}
+					
+					// Social media
+					else if (domain.includes('twitter.com') || domain.includes('x.com')) {
+						linkType = 'social';
+					} else if (domain.includes('facebook.com') || domain.includes('instagram.com') || domain.includes('linkedin.com')) {
+						linkType = 'social';
+					}
+					
+					// Media files (keep your existing logic)
+					else if (fullUrl.match(/\.(mp4|mov|avi|mkv|webm)$/i)) {
+						linkType = 'video';
+					} else if (fullUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) {
+						linkType = 'image';
+					} else if (fullUrl.match(/\.(pdf|doc|docx)$/i)) {
+						linkType = 'document';
+					} else if (fullUrl.match(/\.(mp3|wav|flac|m4a)$/i)) {
+						linkType = 'audio';
+					}
+					
+					// News/articles
+					else if (domain.includes('reddit.com') || domain.includes('news.') || domain.includes('cnn.com') || domain.includes('bbc.')) {
+						linkType = 'news';
+					}
+					
+					const safeUrl = fullUrl.replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+					return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); text-decoration: underline;">${domain}/[${linkType}]</a>`;
+					
+				} catch (e) {
+					return fullUrl; // Return original if URL parsing fails
+				}
+			});
+		}
+
+		function addNpub() {
+			const name = document.getElementById('newNpubName').value.trim();
+			const value = document.getElementById('newNpubValue').value.trim();
+			
+			if (!name && !value) {
+				showMessageBanner("Please enter both a name and npub", 3000);
+				return;
+			}
+			if (!name) {
+				showMessageBanner("Please enter a name for this npub", 3000);
+				return;
+			}
+			if (!value) {
+				showMessageBanner("Please enter an npub value", 3000);
+				return;
+			}
+			
+			// NEW: Validate npub format
+			if (!value.startsWith('npub1') || value.length !== 63) {
+				showMessageBanner("Invalid npub format. Must start with 'npub1' and be 63 characters long.", 4000);
+				return;
+			}
+			
+			// NEW: Check for valid bech32 characters only
+			const validChars = /^npub1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+$/;
+			if (!validChars.test(value)) {
+				showMessageBanner("Invalid npub: contains invalid characters", 3000);
+				return;
+			}
+			
+			// NEW: Sanitize the name to prevent XSS
+			const sanitizedName = name.replace(/[<>&"']/g, '').substring(0, 50);
+			if (sanitizedName !== name) {
+				showMessageBanner("Name was sanitized (removed special characters/length)", 3000);
+			}
+			
+			const npubs = JSON.parse(localStorage.getItem('savedNpubs') || '[]');
+			npubs.push({ name: sanitizedName, value });
+			localStorage.setItem('savedNpubs', JSON.stringify(npubs));
+			
+			document.getElementById('newNpubName').value = '';
+			document.getElementById('newNpubValue').value = '';
+			
+			updateSettingsDisplay();
+			updateSavedSelector();
+			
+			showMessageBanner(`Saved npub: ${sanitizedName}`, 2000);
+		}
+
+		function addRelay() {
+			const name = document.getElementById('newRelayName').value.trim();
+			const value = document.getElementById('newRelayValue').value.trim();
+			
+			if (!name && !value) {
+				showMessageBanner("Please enter both a name and relay URL", 3000);
+				return;
+			}
+			if (!name) {
+				showMessageBanner("Please enter a name for this relay", 3000);
+				return;
+			}
+			if (!value) {
+				showMessageBanner("Please enter a relay URL", 3000);
+				return;
+			}
+			
+			// NEW: Validate relay URL format
+			if (!value.startsWith('wss://') && !value.startsWith('ws://')) {
+				showMessageBanner("Invalid relay URL. Must start with 'wss://' or 'ws://'", 3000);
+				return;
+			}
+			
+			// NEW: Validate URL structure using URL constructor
+			try {
+				const url = new URL(value);
+				
+				// Ensure protocol is WebSocket
+				if (url.protocol !== 'wss:' && url.protocol !== 'ws:') {
+					showMessageBanner("Invalid protocol. Use wss:// or ws://", 3000);
+					return;
+				}
+				
+				// Ensure hostname exists and looks reasonable
+				if (!url.hostname || url.hostname.length < 3 || url.hostname.includes(' ')) {
+					showMessageBanner("Invalid hostname in relay URL", 3000);
+					return;
+				}
+				
+				// Block obvious local/private networks for security
+				if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || 
+					url.hostname.startsWith('192.168.') || url.hostname.startsWith('10.') ||
+					url.hostname.startsWith('172.')) {
+					showMessageBanner("Local/private network relays not allowed", 3000);
+					return;
+				}
+				
+			} catch (error) {
+				showMessageBanner("Invalid relay URL format", 3000);
+				return;
+			}
+			
+			// NEW: Sanitize the name to prevent XSS
+			const sanitizedName = name.replace(/[<>&"']/g, '').substring(0, 50);
+			if (sanitizedName !== name) {
+				showMessageBanner("Name was sanitized (removed special characters/length)", 3000);
+			}
+			
+			const relays = JSON.parse(localStorage.getItem('savedRelays') || '[]');
+			relays.push({ name: sanitizedName, value });
+			localStorage.setItem('savedRelays', JSON.stringify(relays));
+			
+			document.getElementById('newRelayName').value = '';
+			document.getElementById('newRelayValue').value = '';
+			
+			updateSettingsDisplay();
+			updateSavedSelector();
+			
+			showMessageBanner(`Saved relay: ${sanitizedName}`, 2000);
+		}
 
         function removeNpub(index) {
             const npubs = JSON.parse(localStorage.getItem('savedNpubs') || '[]');
@@ -663,12 +1286,181 @@
 			}
 		}
 
+		function createSecureMessageHandler(feedType, realNotes, relay, someFollows, since, currentLimit) {
+			return function(event) {
+				// Sanitize and limit log data to prevent log injection
+				const logData = typeof event.data === 'string' ? 
+					event.data.substring(0, 200).replace(/[<>&"']/g, '') : 
+					'[non-string data]';
+				logToConsole("📨 RAW MESSAGE FROM RELAY: " + logData);
+				
+				try {
+					const message = JSON.parse(event.data);
+					
+					// Validate message structure before accessing
+					if (!Array.isArray(message) || message.length < 1) {
+						logToConsole("🚫 Invalid message format: not a proper array", 'error');
+						return;
+					}
+					
+					// Validate message type is a string
+					if (typeof message[0] !== 'string') {
+						logToConsole("🚫 Invalid message type: not a string", 'error');
+						return;
+					}
+					
+					// Sanitize log output to prevent log injection
+					const sanitizedMessage = JSON.stringify(message).substring(0, 300).replace(/[<>&"']/g, '');
+					logToConsole("📨 PARSED MESSAGE: " + sanitizedMessage);
+					logToConsole("📨 MESSAGE TYPE: " + message[0]);
+					
+					if (message[0] === "EVENT") {
+						// Validate array has enough elements
+						if (message.length < 3) {
+							logToConsole("🚫 EVENT message missing required elements", 'error');
+							return;
+						}
+						
+						const noteData = message[2];
+						
+						// VALIDATE EVENT FIRST
+						if (!validateEventFormat(noteData)) {
+							logToConsole("🚫 Rejecting invalid event from relay", 'error');
+							return;
+						}
+						
+						const isReply = noteData.tags && noteData.tags.some(tag => tag[0] === 'e');
+						if (isReply) {
+							logToConsole("⭐ Skipping reply note");
+							return;
+						}
+						logToConsole("📝 Got a real note: " + noteData.content.slice(0, 50) + "...");
+						
+						const prettyNote = {
+							id: noteData.id,
+							pubkey: noteData.pubkey,
+							author: noteData.pubkey.slice(0, 8) + "...",
+							npub: "npub" + noteData.pubkey.slice(-8),
+							content: noteData.content,
+							timestamp: noteData.created_at,
+							source: feedType === 'npub' ? 'real relay data! 🎉' : 'real relay data!'
+						};
+
+						// Check if we already have this note
+						const existingNote = realNotes.find(note => note.id === noteData.id);
+						if (!existingNote) {
+							realNotes.push(prettyNote);
+						}
+					}
+					
+					// Handle follows list (only for npub feeds)
+					if (feedType === 'npub' && message[0] === "EVENT" && message.length >= 3 && message[2] && typeof message[2] === 'object' && message[2].kind === 3) {
+						const followsEvent = message[2];
+						logToConsole("📋 Got follows list!");
+						
+						const followedPubkeys = [];
+						followsEvent.tags.forEach(tag => {
+							if (tag[0] === 'p') {
+								followedPubkeys.push(tag[1]);
+							}
+						});
+						
+						logToConsole("🤝 This person follows " + followedPubkeys.length + " people");
+						logToConsole("📝 Now getting notes from their follows...");
+						
+						const maxFollowsToCheck = document.getElementById('slowConnection').checked ? 100 : 500;
+						someFollows.length = 0; // Clear array
+						someFollows.push(...followedPubkeys.slice(0, maxFollowsToCheck));
+						since = Math.floor(Date.now() / 1000) - (24 * 60 * 60);
+						
+						const notesRequest = [
+							"REQ",
+							"get-notes",
+							{
+								"kinds": [1],
+								"authors": someFollows,
+								"since": since,
+								"limit": 100
+							}
+						];
+						
+						logToConsole("📤 Asking for notes from " + someFollows.length + " follows (max " + maxFollowsToCheck + ")");
+						relay.send(JSON.stringify(notesRequest));
+					}
+					
+					if (message[0] === "EOSE") {
+						// Validate EOSE message has subscription ID
+						if (message.length < 2 || typeof message[1] !== 'string') {
+							logToConsole("🚫 Invalid EOSE message format", 'error');
+							return;
+						}
+						
+						logToConsole("ℹ EOSE for subscription: " + message[1]);
+						
+						if (message[1] === "get-follows") {
+							logToConsole("✅ Done getting follows list");
+						}
+						
+						if (message[1] === "get-notes" || message[1] === "get-more-notes" || message[1] === "my-sub-id" || message[1] === "get-more-relay-notes") {
+							logToConsole("✅ Done getting notes", 'success');
+							logToConsole("📊 Current count: " + realNotes.length + " notes");
+							
+							if (realNotes.length < 100 && currentLimit < 2000) {
+								logToConsole("🔄 Need more notes, increasing limit and trying again");
+								currentLimit = currentLimit + 200;
+								
+								const requestId = feedType === 'npub' ? "get-more-notes" : "get-more-relay-notes";
+								const notesRequest = [
+									"REQ",
+									requestId,
+									{
+										"kinds": [1],
+										"authors": feedType === 'npub' ? someFollows : undefined,
+										"since": since,
+										"limit": currentLimit
+									}
+								];
+								
+								// Remove undefined properties
+								if (feedType !== 'npub') {
+									delete notesRequest[2].authors;
+								}
+								
+								relay.send(JSON.stringify(notesRequest));
+								return;
+							}
+							
+							currentFeed = realNotes;
+							displayFeed(realNotes);
+							setLoading(false);
+							relay.close();
+							logToConsole("🔌 Connection closed - stopping at " + realNotes.length + " notes");
+						}
+					}
+					
+					if (message[0] === "NOTICE") {
+						// Validate NOTICE message and sanitize content
+						if (message.length >= 2 && typeof message[1] === 'string') {
+							const sanitizedNotice = message[1].substring(0, 200).replace(/[<>&"']/g, '');
+							logToConsole("📢 RELAY NOTICE: " + sanitizedNotice);
+							showError("Relay notice: " + sanitizedNotice);
+						} else {
+							logToConsole("🚫 Invalid NOTICE message format", 'error');
+						}
+					}
+					
+				} catch (e) {
+					// Don't log the full error message (could contain sensitive data)
+					logToConsole("💥 FAILED TO PARSE MESSAGE: Invalid JSON", 'error');
+				}
+			};
+		}
+
 		async function loadNpubFeed(npub) {
 			if (isLoading) return;
 			
 			setLoading(true);
 			
-			let timeout;
 			const realNotes = [];
 			let someFollows = [];
 			let since = 0;
@@ -689,219 +1481,35 @@
 					try {
 						realPubkey = npubToPubkey(npub);
 					} catch (error) {
-						showError('Invalid npub format: ' + error.message);
+						showError('Failed to load npub feed: ' + error.message);
 						setLoading(false);
-						return;
 					}
 				}
 
 				logToConsole("🔑 Using pubkey: " + realPubkey);
 				
-				const relay = new WebSocket('wss://relay.damus.io');
+				const relay = await connectToRelay();
 
-				relay.onopen = function() {
-					clearTimeout(timeout);
-					logToConsole("🎉 Connected to get follows list", 'success');
-					
-					const followsRequest = [
-						"REQ",
-						"get-follows",
-						{
-							"kinds": [3],
-							"authors": [realPubkey],
-							"limit": 1
-						}
-					];
-					
-					logToConsole("📤 Asking for follows list...");
-					relay.send(JSON.stringify(followsRequest));
-				};
+				// Relay is already connected, so send the request immediately
+				logToConsole("🎉 Connected to get follows list", 'success');
 
-				// Set timeout after declaring it
-				timeout = setTimeout(() => {
-					logToConsole("Relay connection timed out", 'warn');
-					relay.close();
-					showError("Connection timed out. The relay may be busy - try again in a moment.");
-					setLoading(false);
-				}, 10000);
-				
-				relay.onopen = function() {
-					try {
-						clearTimeout(timeout);
-						logToConsole("🎉 Connected to get follows list", 'success');
-						
-						const followsRequest = [
-							"REQ",
-							"get-follows",
-							{
-								"kinds": [3],
-								"authors": [realPubkey],
-								"limit": 1
-							}
-						];
-						
-						logToConsole("📤 Asking for follows list...");
-						relay.send(JSON.stringify(followsRequest));
-					} catch (error) {
-						logToConsole("💥 Error in onopen handler: " + error.message, 'error');
+				const followsRequest = [
+					"REQ",
+					"get-follows",
+					{
+						"kinds": [3],
+						"authors": [realPubkey],
+						"limit": 1
 					}
-				};
-				
-				relay.onmessage = function(event) {
-					clearTimeout(timeout); // Now this should work
-					
-					logToConsole("📨 RAW MESSAGE FROM RELAY: " + event.data);
-					
-					try {
-						const message = JSON.parse(event.data);
-						logToConsole("📨 PARSED MESSAGE: " + JSON.stringify(message));
-						logToConsole("📨 MESSAGE TYPE: " + message[0]);
-						
-						if (message[0] === "EVENT" && message[2].kind === 1) {
-							const noteData = message[2];
-							// Skip replies (notes with 'e' tags)
-							const isReply = noteData.tags && noteData.tags.some(tag => tag[0] === 'e');
-							if (isReply) {
-								logToConsole("⏭️ Skipping reply note");
-								return;
-							}
-							logToConsole("📝 Got note: " + noteData.content.slice(0, 50) + "...");
-							
-							const prettyNote = {
-								id: noteData.id,
-								pubkey: noteData.pubkey,
-								author: noteData.pubkey.slice(0, 8) + "...",
-								npub: "npub" + noteData.pubkey.slice(-8),
-								content: noteData.content,
-								timestamp: noteData.created_at,
-								source: 'from follows! 🎯'
-							};
+				];
 
-							// Check if we already have this note
-							const existingNote = realNotes.find(note => note.id === noteData.id);
-							if (!existingNote) {
-								realNotes.push(prettyNote);
-							}
-							}
-						
-						if (message[0] === "EVENT" && message[2].kind === 3) {
-							const followsEvent = message[2];
-							logToConsole("📋 Got follows list!");
-							
-							const followedPubkeys = [];
-							followsEvent.tags.forEach(tag => {
-								if (tag[0] === 'p') {
-									followedPubkeys.push(tag[1]);
-								}
-							});
-							
-							logToConsole("🤝 This person follows " + followedPubkeys.length + " people");
-							
-							// NEW: Now ask for notes from those follows
-							logToConsole("📝 Now getting notes from their follows...");
-							
-							const maxFollowsToCheck = document.getElementById('slowConnection').checked ? 100 : 500;
-							someFollows = followedPubkeys.slice(0, maxFollowsToCheck);
-							since = Math.floor(Date.now() / 1000) - (24 * 60 * 60);
-							
-							const notesRequest = [
-								"REQ",
-								"get-notes",
-								{
-									"kinds": [1],
-									"authors": someFollows,
-									"since": since,
-									"limit": 100  // Fixed at 100 notes max
-								}
-							];
-							
-							logToConsole("📤 Asking for notes from " + someFollows.length + " follows (max " + maxFollowsToCheck + ")");
-							relay.send(JSON.stringify(notesRequest));
-							
-						}
-						
-						if (message[0] === "EOSE") {
-							logToConsole("⏹ EOSE for subscription: " + message[1]);
-							
-							if (message[1] === "get-follows") {
-								logToConsole("✅ Done getting follows list");
-								// Don't close - we're still waiting for notes
-							}
-							
-							if (message[1] === "get-notes") {
-								logToConsole("✅ Done getting notes from follows", 'success');
-								logToConsole("📊 Current count: " + realNotes.length + " notes");
-								
-								if (realNotes.length < 100) {
-									logToConsole("🔄 Need more notes, increasing limit and trying again");
-									currentLimit = currentLimit + 200;
-									
-									const notesRequest = [
-										"REQ",
-										"get-more-notes",
-										{
-											"kinds": [1],
-											"authors": someFollows,
-											"since": since,
-											"limit": currentLimit
-										}
-									];
-									
-									relay.send(JSON.stringify(notesRequest));
-									return;
-								}
-								
-								currentFeed = realNotes;
-								displayFeed(realNotes);
-								setLoading(false);
-								relay.close();
-								logToConsole("🔌 Connection closed - got enough notes");
-							}
-							
-							if (message[1] === "get-more-notes") {
-								logToConsole("✅ Done getting additional notes", 'success');
-								logToConsole("📊 Final count: " + realNotes.length + " notes");
-								
-								if (realNotes.length < 100 && currentLimit < 2000) {
-									logToConsole("🔄 Still need more, trying again");
-									currentLimit = currentLimit + 200;
-									
-									const notesRequest = [
-										"REQ",
-										"get-more-notes",
-										{
-											"kinds": [1],
-											"authors": someFollows,
-											"since": since,
-											"limit": currentLimit
-										}
-									];
-									
-									relay.send(JSON.stringify(notesRequest));
-									return;
-								}
-								
-								currentFeed = realNotes;
-								displayFeed(realNotes); // ← ADD THIS LINE
-								setLoading(false);
-								relay.close();
-								logToConsole("🔌 Connection closed - stopping at " + realNotes.length + " notes");
-							}
-						}
-						
-						if (message[0] === "NOTICE") {
-							logToConsole("🔔 RELAY NOTICE: " + message[1]);
-							showError("Relay notice: " + message[1]);
-						}
-						
-					} catch (e) {
-						logToConsole("💥 FAILED TO PARSE MESSAGE: " + e);
-					}
-				};
+				logToConsole("📤 Asking for follows list...");
+				relay.send(JSON.stringify(followsRequest));
+
+				relay.onmessage = createSecureMessageHandler('npub', realNotes, relay, someFollows, since, currentLimit);
 				
 				relay.onerror = function(error) {
-					if (timeout) clearTimeout(timeout);
-					showError('Unable to connect to Nostr relay.');
+					showError('Relay connection lost during operation.');
 					setLoading(false);
 				};
 				
@@ -909,6 +1517,105 @@
 				if (timeout) clearTimeout(timeout);
 				showError('Failed to load npub feed: ' + error.message);
 				setLoading(false);
+			}
+		}
+
+		function tryConnectToSingleRelay(relayUrl) {
+			return new Promise((resolve, reject) => {
+				// NEW: Validate URL before connecting
+				try {
+					const url = new URL(relayUrl);
+					if (url.protocol !== 'wss:' && url.protocol !== 'ws:') {
+						reject(new Error('Invalid protocol'));
+						return;
+					}
+				} catch (e) {
+					reject(new Error('Invalid URL format'));
+					return;
+				}
+				
+				const relay = new WebSocket(relayUrl);
+				let timeoutId = null;
+				let isResolved = false;
+				
+				const cleanup = () => {
+					if (timeoutId) {
+						clearTimeout(timeoutId);
+						timeoutId = null;
+					}
+				};
+				
+				const resolveOnce = (value) => {
+					if (!isResolved) {
+						isResolved = true;
+						cleanup();
+						resolve(value);
+					}
+				};
+				
+				const rejectOnce = (error) => {
+					if (!isResolved) {
+						isResolved = true;
+						cleanup();
+						if (relay.readyState === WebSocket.CONNECTING || relay.readyState === WebSocket.OPEN) {
+							relay.close();
+						}
+						reject(error);
+					}
+				};
+				
+				timeoutId = setTimeout(() => {
+					logToConsole(`Connection timeout for ${relayUrl}`, 'warn');
+					rejectOnce(new Error(`Connection timeout after 5 seconds`));
+				}, 5000);
+				
+				relay.onopen = function() {
+					logToConsole(`WebSocket opened successfully: ${relayUrl}`, 'success');
+					resolveOnce(relay);
+				};
+				
+				relay.onerror = function(error) {
+					const errorMsg = error.message || error.type || 'Unknown WebSocket error';
+					logToConsole(`WebSocket error for ${relayUrl}: ${errorMsg}`, 'error');
+					rejectOnce(new Error(`WebSocket connection failed: ${errorMsg}`));
+				};
+				
+				relay.onclose = function(event) {
+					if (!isResolved) {
+						const reason = event.reason || `Code ${event.code}`;
+						logToConsole(`WebSocket closed unexpectedly for ${relayUrl}: ${reason}`, 'warn');
+						rejectOnce(new Error(`Connection closed: ${reason}`));
+					}
+				};
+			});
+		}
+
+		// Try connecting to primary relay, then fallbacks if it fails
+		async function connectToRelay() {
+			const PRIMARY_RELAY = 'wss://relay.damus.io';
+			const allRelays = [PRIMARY_RELAY, ...FALLBACK_RELAYS];
+			
+			for (let i = 0; i < allRelays.length; i++) {
+				const relayUrl = allRelays[i];
+				logToConsole(`Attempting connection ${i + 1}/${allRelays.length}: ${relayUrl}`);
+				
+				// Basic check for hardcoded relays (don't wait long, just try)
+				const relayInfo = await getRelayInfo(relayUrl);
+				if (relayInfo) {
+					logToConsole(`Relay ${relayUrl}: ${relayInfo.name || 'unnamed'} (${relayInfo.software || 'unknown software'})`);
+				}
+				
+				try {
+					const relay = await tryConnectToSingleRelay(relayUrl);
+					logToConsole(`Successfully connected to: ${relayUrl}`, 'success');
+					return relay;
+				} catch (error) {
+					logToConsole(`Failed to connect to ${relayUrl}: ${error.message}`, 'error');
+					
+					if (i === allRelays.length - 1) {
+						throw new Error('All relays failed to connect');
+					}
+				}
 			}
 		}
 
@@ -924,13 +1631,58 @@
 			let since = 0; 
 			
 			try {
-				logToConsole("Trying to connect to: " + relayUrl);
+				logToConsole("User relay detected - performing comprehensive checks...");
+				
+				// Comprehensive relay validation for user-entered relays
+				const relayInfo = await getRelayInfo(relayUrl);
+				
+				if (relayInfo) {
+					logToConsole(`Relay Info: ${relayInfo.name || 'Unnamed'}`);
+					logToConsole(`Description: ${relayInfo.description || 'No description'}`);
+					logToConsole(`Software: ${relayInfo.software || 'Unknown'} ${relayInfo.version || ''}`);
+					
+					// Show relay info in banner instead of separate element
+					const relayName = relayInfo.name || 'Unnamed Relay';
+					const relayDesc = relayInfo.description || 'No description';
+					showMessageBanner(`Connected to relay: ${relayName} - ${relayDesc}`, 8000);
+					
+					// Check supported NIPs
+					if (relayInfo.supported_nips && relayInfo.supported_nips.length > 0) {
+						logToConsole(`Supported NIPs: [${relayInfo.supported_nips.join(', ')}]`);
+						
+						// Check if it supports basic requirements
+						if (!relayInfo.supported_nips.includes(1)) {
+							showMessageBanner("WARNING: This relay doesn't support basic text notes (NIP-01)", 5000);
+						}
+					} else {
+						logToConsole("No NIP information provided by relay", 'warn');
+					}
+					
+					// Check limitations
+					if (relayInfo.limitation) {
+						const limits = relayInfo.limitation;
+						if (limits.payment_required) {
+							showMessageBanner("INFO: This relay requires payment", 3000);
+						}
+						if (limits.auth_required) {
+							showMessageBanner("INFO: This relay requires authentication", 3000);
+						}
+						if (limits.max_limit && limits.max_limit < 100) {
+							showMessageBanner(`INFO: This relay limits queries to ${limits.max_limit} events`, 3000);
+						}
+					}
+					
+				} else {
+					showMessageBanner("WARNING: Could not get information about this relay", 4000);
+				}
+				
+				logToConsole("Attempting WebSocket connection to: " + relayUrl);
 				
 				const relay = new WebSocket(relayUrl);
 
 				
 				relay.onopen = function() {
-					logToConsole("🎉 Connected to relay: " + relayUrl);
+					logToConsole("Connected to relay: " + relayUrl);
 					
 					since = Math.floor(Date.now() / 1000) - (24 * 60 * 60); // Always 24 hours (remove const)
 					const requestMessage = [
@@ -943,75 +1695,14 @@
 						}
 					];
 					
-					logToConsole("📤 Asking relay for notes");
+					logToConsole("Asking relay for notes");
 					relay.send(JSON.stringify(requestMessage));
 				};
 				
-				relay.onmessage = function(event) {
-					const message = JSON.parse(event.data);
-					logToConsole("📨 Got message type: " + message[0]);
-					
-					if (message[0] === "EVENT") {
-						const noteData = message[2]; // The actual note content
-						const isReply = noteData.tags && noteData.tags.some(tag => tag[0] === 'e');
-						if (isReply) {
-							logToConsole("⏭️ Skipping reply note");
-							return;
-						}
-						logToConsole("📝 Got a real note: " + noteData.content.slice(0, 50) + "...");
-						
-						const prettyNote = {
-							id: noteData.id,
-							pubkey: noteData.pubkey,
-							author: noteData.pubkey.slice(0, 8) + "...",
-							npub: "npub" + noteData.pubkey.slice(-8),
-							content: noteData.content,
-							timestamp: noteData.created_at,
-							source: 'real relay data! 🎉'
-						};
-
-						// Check if we already have this note
-						const existingNote = realNotes.find(note => note.id === noteData.id);
-						if (!existingNote) {
-							realNotes.push(prettyNote);
-						}
-						}
-					
-					if (message[0] === "EOSE") {
-						logToConsole("✅ EOSE for subscription: " + message[1]);
-						
-						if (message[1] === "my-sub-id" || message[1] === "get-more-relay-notes") {
-							logToConsole("📊 Current count: " + realNotes.length + " notes");
-							
-							if (realNotes.length < 100 && currentLimit < 2000) {
-								logToConsole("🔄 Need more notes from relay, increasing limit");
-								currentLimit = currentLimit + 500;
-								
-								const requestMessage = [
-									"REQ",
-									"get-more-relay-notes",
-									{
-										"kinds": [1],
-										"since": since,
-										"limit": currentLimit
-									}
-								];
-								
-								relay.send(JSON.stringify(requestMessage));
-								return;
-							}
-							
-							currentFeed = realNotes;
-							displayFeed(realNotes); // ← ADD THIS LINE
-							setLoading(false);
-							relay.close();
-							logToConsole("🔌 Connection closed - stopping at " + realNotes.length + " notes");
-						}
-					}
-				};
+				relay.onmessage = createSecureMessageHandler('relay', realNotes, relay, [], since, currentLimit);
 				
 				relay.onerror = function(error) {
-					logToConsole("💥 Connection error: " + error);
+					logToConsole("Connection error: " + error);
 					showError('Failed to connect to relay');
 					setLoading(false);
 				};
@@ -1026,19 +1717,54 @@
 			const container = document.getElementById('feedContainer');
 			const sortOrder = document.getElementById('sortOrder').value;
 			
-			// ALWAYS clear the container first
-			container.innerHTML = '';
+			// Limit feed size to prevent memory issues
+			const MAX_FEED_SIZE = 500;
+			if (notes.length > MAX_FEED_SIZE) {
+				logToConsole(`Feed limited to ${MAX_FEED_SIZE} notes (was ${notes.length})`, 'warn');
+				notes = notes.slice(0, MAX_FEED_SIZE);
+			}
+			
+			// Clear container but preserve demo alert if we're still on demo feed
+			const existingDemoAlert = container.querySelector('[data-demo-alert="true"]');
+			const shouldPreserveDemoAlert = existingDemoAlert && 
+				currentType === 'npub' && 
+				currentValue === 'npub1v89nr2zax8ef0ceyu9te0sjyqv3newa3e82m0rd4kye3ekeyhv2sqf30cc';
+
+			// Clear all children
+			while (container.firstChild) {
+				container.removeChild(container.firstChild);
+			}
+
+			// Put demo alert back if we should preserve it
+			if (shouldPreserveDemoAlert) {
+				container.appendChild(existingDemoAlert);
+			}
+			
+			// Clear image processing state
+			imageProcessingQueue = [];
+			isProcessingImages = false;
+			
+			// Prevent multiple simultaneous username fetches
+			if (fetchUsernames && isLookingUpUsernames) {
+				fetchUsernames = false;
+				logToConsole("Skipping username fetch - already in progress");
+			}
 			
 			// Check if we might have hit the limit and add warning AFTER clearing
 			if (notes.length >= 500) {
 				const warning = document.createElement('div');
 				warning.style.cssText = 'background: #fef3c7; border: 1px solid #f59e0b; padding: 8px; margin-bottom: 16px; border-radius: 6px; font-size: 14px;';
-				warning.textContent = '⚠️ Showing 1000+ notes (may be incomplete). This relay has lots of activity!';
+				warning.textContent = 'Warning: Showing 1000+ notes (may be incomplete). This relay has lots of activity!';
 				container.appendChild(warning);
 			}
 			
 			if (notes.length === 0) {
-				container.innerHTML = '<div class="empty-state"><p>No notes found for the selected criteria.</p></div>';
+				const emptyDiv = document.createElement('div');
+				emptyDiv.className = 'empty-state';
+				const emptyP = document.createElement('p');
+				emptyP.textContent = 'No notes found for the selected criteria.';
+				emptyDiv.appendChild(emptyP);
+				container.appendChild(emptyDiv);
 				return;
 			}
 			
@@ -1075,23 +1801,87 @@
 				const noteContentDiv = document.createElement('div');
 				noteContentDiv.className = 'note-content';
 
-				// Truncate content to first X characters
-				const maxLength = 420; // Change this number to whatever you want
-				const truncatedContent = note.content.length > maxLength 
-					? note.content.slice(0, maxLength) + '...'
-					: note.content;
+				// NEW: Validate and limit content length
+				const maxContentLength = 100000; // 100KB limit
+				let safeContent = note.content;
+				if (typeof safeContent !== 'string') {
+					safeContent = '[Invalid content type]';
+				} else if (safeContent.length > maxContentLength) {
+					safeContent = safeContent.slice(0, maxContentLength) + '... [content truncated for security]';
+				}
 
-				noteContentDiv.innerHTML = escapeHtml(truncatedContent);
+				// Handle long content with expand/collapse
+				if (safeContent.length > 250) {
+					const shortContent = safeContent.slice(0, 250);
+					const fullContent = safeContent;
+					
+					// Clear the content div
+					noteContentDiv.innerHTML = '';
+					
+					// Create short content span
+					const shortSpan = document.createElement('span');
+					shortSpan.className = 'note-short';
+					
+					// Add the short content safely
+					const shortContentElement = escapeHtml(shortContent + '... ');
+					shortSpan.appendChild(shortContentElement);
+					
+					// Create "show more" button
+					const showMoreBtn = document.createElement('button');
+					showMoreBtn.textContent = 'show more';
+					showMoreBtn.style.cssText = 'background:none; border:none; color:var(--accent-orange); cursor:pointer; padding:0; font-size:14px;';
+					showMoreBtn.addEventListener('click', function() {
+						shortSpan.style.display = 'none';
+						fullSpan.style.display = 'block';
+					});
+					
+					shortSpan.appendChild(showMoreBtn);
+					
+					// Create full content span
+					const fullSpan = document.createElement('span');
+					fullSpan.className = 'note-full';
+					fullSpan.style.display = 'none';
+					
+					// Add the full content safely
+					const fullContentElement = escapeHtml(fullContent + ' ');
+					fullSpan.appendChild(fullContentElement);
+					
+					// Create "show less" button
+					const showLessBtn = document.createElement('button');
+					showLessBtn.textContent = 'show less';
+					showLessBtn.style.cssText = 'background:none; border:none; color:var(--accent-orange); cursor:pointer; padding:0; font-size:14px;';
+					showLessBtn.addEventListener('click', function() {
+						fullSpan.style.display = 'none';
+						shortSpan.style.display = 'block';
+					});
+					
+					fullSpan.appendChild(showLessBtn);
+					
+					// Add both spans to the content div
+					noteContentDiv.appendChild(shortSpan);
+					noteContentDiv.appendChild(fullSpan);
+					
+				} else {
+					// Clear the content div first
+					noteContentDiv.innerHTML = '';
+					
+					// Add the content safely
+					const safeContentElement = escapeHtml(safeContent);
+					noteContentDiv.appendChild(safeContentElement);
+				}
 
 				noteElement.appendChild(noteHeader);
 				noteElement.appendChild(noteContentDiv);
+
+				// Process images after adding the note to DOM
+				processImagesInContent(safeContent, noteElement);
 				
 				// Add avatar if we have one
 				if (note.avatar && !document.getElementById('slowConnection').checked) {
 					const authorElement = noteElement.querySelector('.author-name');
 					const avatar = document.createElement('img');
 					avatar.src = note.avatar;
-					avatar.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; margin-right: 8px; vertical-align: middle;';
+					avatar.style.cssText = 'width: 50px; height: 50px; border-radius: 50%; margin-right: 8px; vertical-align: middle;';
 					avatar.alt = 'Profile photo';
 					avatar.onerror = function() { this.style.display = 'none'; }; // Hide if image fails
 					authorElement.insertBefore(avatar, authorElement.firstChild);
@@ -1203,8 +1993,46 @@
 					const pubkey = profileData.pubkey;
 					
 					try {
+						// NEW: Validate content before parsing
+						if (!profileData.content || typeof profileData.content !== 'string') {
+							logToConsole("Invalid profile content format", 'error');
+							return;
+						}
+
+						// NEW: Limit content size before parsing
+						if (profileData.content.length > 10000) {
+							logToConsole("Profile content too large, skipping", 'warn');
+							return;
+						}
+
 						const profile = JSON.parse(profileData.content);
-						const displayName = profile.display_name || profile.name || pubkey.slice(0, 8) + "...";
+						
+						// NEW: Validate profile is an object
+						if (!profile || typeof profile !== 'object') {
+							logToConsole("Invalid profile data format", 'error');
+							return;
+						}
+						
+						// Sanitize display name - only allow safe characters
+						let rawDisplayName = profile.display_name || profile.name || '';
+						
+						// NEW: Ensure it's a string
+						if (typeof rawDisplayName !== 'string') {
+							rawDisplayName = '';
+						}
+						
+						// Remove any HTML tags and dangerous characters
+						rawDisplayName = rawDisplayName.replace(/<[^>]*>/g, ''); // Strip HTML
+						rawDisplayName = rawDisplayName.replace(/[<>&"']/g, ''); // Remove dangerous chars
+						rawDisplayName = rawDisplayName.trim();
+						
+						// Limit length to prevent UI issues
+						if (rawDisplayName.length > 50) {
+							rawDisplayName = rawDisplayName.slice(0, 50) + '...';
+						}
+						
+						// Use sanitized name or fallback
+						const displayName = rawDisplayName || pubkey.slice(0, 8) + "...";
 						
 						// Validate avatar URL
 						let safeAvatarUrl = null;
@@ -1221,16 +2049,34 @@
 						
 						logToConsole(`👤 Found name: ${displayName} for ${pubkey.slice(0, 8)}...`);
 						
-						// UPDATE THE NOTES THEMSELVES with the validated data
+						// UPDATE THE NOTES DATA
 						currentFeed.forEach(note => {
 							if (note.pubkey === pubkey) {
 								note.displayName = displayName;
-								note.avatar = safeAvatarUrl; // Only set if valid
+								note.avatar = safeAvatarUrl;
 							}
 						});
 						
-						// Re-display the feed to show the updated names
-						displayFeed(currentFeed, false);
+						// UPDATE ONLY THE DOM ELEMENTS for this pubkey - more efficient
+						const authorElements = document.querySelectorAll(`[data-pubkey="${pubkey}"]`);
+						authorElements.forEach(element => {
+							// Update the text content
+							element.textContent = displayName;
+							
+							// Add avatar if we have one and not in slow connection mode
+							if (safeAvatarUrl && !document.getElementById('slowConnection').checked && !element.querySelector('img')) {
+								const avatar = document.createElement('img');
+								avatar.src = safeAvatarUrl;
+								avatar.style.cssText = 'width: 50px; height: 50px; border-radius: 50%; margin-right: 8px; vertical-align: middle;';
+								avatar.alt = 'Profile photo';
+								// NEW: Add security attributes
+								avatar.crossOrigin = 'anonymous';
+								avatar.referrerPolicy = 'no-referrer';
+								avatar.loading = 'lazy';
+								avatar.onerror = function() { this.style.display = 'none'; };
+								element.insertBefore(avatar, element.firstChild);
+							}
+						});
 						
 					} catch (e) {
 						logToConsole("⚠ Failed to parse profile for " + pubkey.slice(0, 8));
@@ -1255,6 +2101,7 @@
 			const container = document.getElementById('feedContainer');
 			const infoDiv = document.createElement('div');
 			infoDiv.style.cssText = 'background: #dbeafe; border: 1px solid #3b82f6; padding: 12px; margin-bottom: 16px; border-radius: 6px; font-size: 14px;';
+			infoDiv.setAttribute('data-demo-alert', 'true');
 			
 			const strongText = document.createElement('strong');
 			strongText.textContent = "You're viewing a demo feed!";
@@ -1295,16 +2142,17 @@
 		}
 
 		function shortenLongStrings(text) {
-			// Look for long alphanumeric strings (20+ chars) that aren't already links
-			return text.replace(/\b[a-zA-Z0-9]{20,}\b/g, function(match) {
-				// Skip if it's already a known nostr identifier
-				if (match.startsWith('npub1') || match.startsWith('note1') || 
-					match.startsWith('nevent1') || match.startsWith('nprofile1')) {
-					return match; // Let existing regex handle these
-				}
-				
-				// Shorten other long strings
-				return match.slice(0, 12) + '...';
+			// Skip content inside HTML tags and only process plain text
+			return text.replace(/([^<]*?)(<[^>]*>)/g, function(match, textPart, htmlPart) {
+				const shortenedText = textPart.replace(/\b[a-zA-Z0-9]{20,}\b/g, function(longString) {
+					// Skip if it's already a known nostr identifier
+					if (longString.startsWith('npub1') || longString.startsWith('note1') || 
+						longString.startsWith('nevent1') || longString.startsWith('nprofile1')) {
+						return longString;
+					}
+					return longString.slice(0, 12) + '...';
+				});
+				return shortenedText + htmlPart;
 			});
 		}
 
@@ -1335,7 +2183,7 @@
 				const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
 				const estimatedSize = dataUrl.length * 0.75; // Rough byte estimate
 				
-				if (estimatedSize < 200000) { // 200KB limit
+				if (estimatedSize < 50000) { // 50KB limit
 					// Create avatar image
 					const avatar = document.createElement('img');
 					avatar.src = imageUrl;
@@ -1355,55 +2203,231 @@
 		}
 
 		function escapeHtml(text) {
-			const div = document.createElement('div');
-			div.textContent = text;
-			let html = div.innerHTML;
+			// NEW: Input validation and length limits
+			if (typeof text !== 'string') {
+				return document.createTextNode('[Invalid content type]');
+			}
 			
-			// Convert nostr identifiers to short links
-			html = html.replace(/(nevent1[a-zA-Z0-9]+)/g, '&nbsp;<a href="https://njump.me/$1" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); text-decoration: underline;">nevent1...</a>');
-			html = html.replace(/(note1[a-zA-Z0-9]+)/g, '&nbsp;<a href="https://njump.me/$1" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); text-decoration: underline;">note1...</a>');
-			html = html.replace(/(npub1[a-zA-Z0-9]+)/g, '&nbsp;<a href="https://njump.me/$1" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); text-decoration: underline;">npub1...</a>');
-			html = html.replace(/(nprofile1[a-zA-Z0-9]+)/g, '&nbsp;<a href="https://njump.me/$1" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); text-decoration: underline;">nprofile1...</a>');
+			// NEW: Limit text length to prevent memory exhaustion attacks
+			if (text.length > 50000) {
+				text = text.substring(0, 50000) + '... [content truncated for security]';
+			}
 			
-			html = shortenLongStrings(html);
+			// Create a container div to hold all content
+			const container = document.createElement('div');
 			
-			return html;
+			// NEW: More restrictive URL regex to prevent edge cases
+			const urlRegex = /(https?:\/\/[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]\.[a-zA-Z]{2,}(?:\/[^\s<>"'\[\]{}|\\^`]*)?)/gi;
+			const parts = text.split(urlRegex);
+			
+			for (let i = 0; i < parts.length; i++) {
+				const part = parts[i];
+				
+				// Check if this part is a URL
+				if (part.match(urlRegex)) {
+					try {
+						const urlObj = new URL(part);
+						
+						// SECURITY: Only allow safe protocols
+						if (urlObj.protocol !== 'https:' && urlObj.protocol !== 'http:') {
+							// Treat as plain text if protocol is unsafe
+							const textNode = document.createTextNode(part);
+							container.appendChild(textNode);
+							continue;
+						}
+						
+						// NEW: Additional URL safety checks
+						if (urlObj.hostname.length > 100 || urlObj.pathname.length > 500) {
+							const textNode = document.createTextNode('[suspicious URL blocked]');
+							container.appendChild(textNode);
+							continue;
+						}
+						
+						// Create safe link element
+						const linkElement = document.createElement('a');
+						linkElement.href = part;
+						linkElement.target = '_blank';
+						linkElement.rel = 'noopener noreferrer';
+						linkElement.style.color = 'var(--accent-orange)';
+						linkElement.style.textDecoration = 'underline';
+						
+						// Determine link type for display
+						const domain = urlObj.hostname.replace(/^www\./, '');
+						const path = urlObj.pathname.toLowerCase();
+						
+						let linkType = 'web';
+						
+						// Video platforms
+						if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
+							linkType = 'video';
+						} else if (domain.includes('rumble.com') || domain.includes('vimeo.com') || domain.includes('twitch.tv')) {
+							linkType = 'video';
+						} else if (domain.includes('tiktok.com') || domain.includes('instagram.com') && path.includes('/reel')) {
+							linkType = 'video';
+						}
+						// Music platforms
+						else if (domain.includes('spotify.com') || domain.includes('tidal.com') || domain.includes('apple.com') && path.includes('music')) {
+							linkType = 'music';
+						} else if (domain.includes('soundcloud.com') || domain.includes('bandcamp.com')) {
+							linkType = 'music';
+						}
+						// Social media
+						else if (domain.includes('twitter.com') || domain.includes('x.com')) {
+							linkType = 'social';
+						} else if (domain.includes('facebook.com') || domain.includes('instagram.com') || domain.includes('linkedin.com')) {
+							linkType = 'social';
+						}
+						// Media files
+						else if (part.match(/\.(mp4|mov|avi|mkv|webm)$/i)) {
+							linkType = 'video';
+						} else if (part.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) {
+							linkType = 'image';
+						} else if (part.match(/\.(pdf|doc|docx)$/i)) {
+							linkType = 'document';
+						} else if (part.match(/\.(mp3|wav|flac|m4a)$/i)) {
+							linkType = 'audio';
+						}
+						// News/articles
+						else if (domain.includes('reddit.com') || domain.includes('news.') || domain.includes('cnn.com') || domain.includes('bbc.')) {
+							linkType = 'news';
+						}
+						
+						// Set safe text content
+						linkElement.textContent = `${domain}/[${linkType}]`;
+						container.appendChild(linkElement);
+						
+					} catch (e) {
+						// If URL parsing fails, treat as plain text
+						const textNode = document.createTextNode(part);
+						container.appendChild(textNode);
+					}
+				} else {
+					// NEW: More restrictive nostr identifier regex
+					const nostrRegex = /(nevent1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{10,}|note1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{10,}|npub1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{58}|nprofile1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{10,})/g;
+					const nostrParts = part.split(nostrRegex);
+					
+					for (let j = 0; j < nostrParts.length; j++) {
+						const nostrPart = nostrParts[j];
+						
+						if (nostrPart.match(nostrRegex)) {
+							// NEW: Additional validation for nostr identifiers
+							if (nostrPart.length > 200) {
+								const textNode = document.createTextNode('[nostr ID too long]');
+								container.appendChild(textNode);
+								continue;
+							}
+							
+							// Create safe nostr link
+							const nostrLink = document.createElement('a');
+							nostrLink.href = `https://njump.me/${nostrPart}`;
+							nostrLink.target = '_blank';
+							nostrLink.rel = 'noopener noreferrer';
+							nostrLink.style.color = 'var(--accent-orange)';
+							nostrLink.style.textDecoration = 'underline';
+							nostrLink.textContent = nostrPart.substring(0, nostrPart.indexOf('1') + 2) + '...';
+							
+							// Add non-breaking space before
+							container.appendChild(document.createTextNode('\u00A0'));
+							container.appendChild(nostrLink);
+						} else {
+							// Regular text - shorten long strings
+							let processedText = nostrPart.replace(/\b[a-zA-Z0-9]{20,}\b/g, function(longString) {
+								// Skip if it's already a known nostr identifier
+								if (longString.startsWith('npub1') || longString.startsWith('note1') || 
+									longString.startsWith('nevent1') || longString.startsWith('nprofile1')) {
+									return longString;
+								}
+								return longString.slice(0, 12) + '...';
+							});
+							
+							const textNode = document.createTextNode(processedText);
+							container.appendChild(textNode);
+						}
+					}
+				}
+			}
+			
+			return container;
 		}
 
         function setLoading(loading) {
             isLoading = loading;
             const container = document.getElementById('feedContainer');
-            
-            if (loading) {
-                container.innerHTML = '<div class="loading">Loading notes...</div>';
-            }
+			if (loading) {
+				// Clear container but preserve demo alert if we're still on demo feed
+				const existingDemoAlert = container.querySelector('[data-demo-alert="true"]');
+				const shouldPreserveDemoAlert = existingDemoAlert && 
+					currentType === 'npub' && 
+					currentValue === 'npub1v89nr2zax8ef0ceyu9te0sjyqv3newa3e82m0rd4kye3ekeyhv2sqf30cc';
+
+				// Clear all children
+				while (container.firstChild) {
+					container.removeChild(container.firstChild);
+				}
+
+				// Put demo alert back if we should preserve it
+				if (shouldPreserveDemoAlert) {
+					container.appendChild(existingDemoAlert);
+				}
+				
+				// Create loading div
+				const loadingDiv = document.createElement('div');
+				loadingDiv.className = 'loading';
+				loadingDiv.textContent = 'Loading notes...';
+				container.appendChild(loadingDiv);
+			}
         }
 
 		function showError(message) {
 			const container = document.getElementById('feedContainer');
 			
+			// Clear container but preserve demo alert if we're still on demo feed
+			const existingDemoAlert = container.querySelector('[data-demo-alert="true"]');
+			const shouldPreserveDemoAlert = existingDemoAlert && 
+				currentType === 'npub' && 
+				currentValue === 'npub1v89nr2zax8ef0ceyu9te0sjyqv3newa3e82m0rd4kye3ekeyhv2sqf30cc';
+
+			// Clear all children
+			while (container.firstChild) {
+				container.removeChild(container.firstChild);
+			}
+
+			// Put demo alert back if we should preserve it
+			if (shouldPreserveDemoAlert) {
+				container.appendChild(existingDemoAlert);
+			}
+			
 			const errorDiv = document.createElement('div');
 			errorDiv.className = 'error';
-			errorDiv.textContent = message; // Safe - automatically escaped
-			
-			container.innerHTML = ''; // Clear container
+			errorDiv.textContent = message;
 			container.appendChild(errorDiv);
 		}
 
         // Handle Enter key in input
-        document.getElementById('npubInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                loadFeed();
-            }
-        });
+		document.getElementById('npubInput').addEventListener('keypress', function(e) {
+			if (e.key === 'Enter') {
+				// NEW: Basic input validation before processing
+				const value = this.value.trim();
+				if (value.length > 200) {
+					showMessageBanner("Input too long", 3000);
+					return;
+				}
+				loadFeed();
+			}
+		});
 
-        // Close modal when clicking outside
-        window.addEventListener('click', function(event) {
-            const modal = document.getElementById('settingsModal');
-            if (event.target === modal) {
-                closeSettings();
-            }
-        });
+		// Close modal when clicking outside
+		window.addEventListener('click', function(event) {
+			// NEW: Validate event and target exist
+			if (!event || !event.target) {
+				return;
+			}
+			
+			const modal = document.getElementById('settingsModal');
+			if (event.target === modal) {
+				closeSettings();
+			}
+		});
 		
 		// Handle slow connection checkbox changes
 		document.getElementById('slowConnection').addEventListener('change', function() {
@@ -1424,7 +2448,14 @@
 		// Handle selector change
 		document.getElementById('savedSelector').addEventListener('change', function() {
 			if (this.value) {
-				document.getElementById('npubInput').value = this.value;
+				// NEW: Validate selected value before using it
+				const value = this.value.trim();
+				if (value.length < 2000 && (value.startsWith('npub1') || value.startsWith('wss://') || value.startsWith('ws://'))) {
+					document.getElementById('npubInput').value = value;
+				} else {
+					this.value = ''; // Reset selector if invalid
+					showMessageBanner("Invalid selection detected", 3000);
+				}
 			}
 		});
 
