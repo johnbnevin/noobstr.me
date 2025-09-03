@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Noobstr.me - The Read Only Nostr Noobstr Soft Landing Client</title>
+	<title>Noobstr.me - The Read Only Nostr Noobstr Slow Connection Soft Landing Client</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='90' font-size='90'>🤙</text></svg>">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' wss: ws: https:;">
 	<style>
@@ -2017,17 +2017,6 @@
 				// Process images after adding the note to DOM
 				processImagesInContent(safeContent, noteElement);
 				
-				// Add avatar if we have one
-				if (note.avatar && !document.getElementById('slowConnection').checked) {
-					const authorElement = noteElement.querySelector('.author-name');
-					const avatar = document.createElement('img');
-					avatar.src = note.avatar;
-					avatar.style.cssText = 'width: 50px; height: 50px; border-radius: 50%; margin-right: 8px; vertical-align: middle;';
-					avatar.alt = 'Profile photo';
-					avatar.onerror = function() { this.style.display = 'none'; }; // Hide if image fails
-					authorElement.insertBefore(avatar, authorElement.firstChild);
-				}
-				
 				container.appendChild(noteElement);
 			});
 			
@@ -2232,19 +2221,7 @@
 							
 							// Add avatar if we have one and not in slow connection mode
 							if (safeAvatarUrl && !document.getElementById('slowConnection').checked && !element.querySelector('img')) {
-								const avatar = document.createElement('img');
-								avatar.src = safeAvatarUrl;
-								avatar.style.cssText = 'width: 50px; height: 50px; border-radius: 50%; margin-right: 8px; vertical-align: middle;';
-								avatar.alt = 'Profile photo';
-								avatar.crossOrigin = 'anonymous';
-								avatar.referrerPolicy = 'no-referrer';
-								avatar.loading = 'lazy';
-								avatar.onerror = function() { 
-									this.style.display = 'none'; 
-									// Clean up the failed image element
-									this.remove();
-								};
-								element.insertBefore(avatar, element.firstChild);
+								loadProfileImage(safeAvatarUrl, element, pubkey);
 							}
 						});
 						
@@ -2345,39 +2322,40 @@
 				return; // Skip invalid URLs
 			}
 			
-			// Create a temporary image to check size before displaying
-			const tempImg = new Image();
-			tempImg.crossOrigin = 'anonymous';
-			
-			tempImg.onload = function() {
-				// Estimate file size (rough approximation)
-				const canvas = document.createElement('canvas');
-				const ctx = canvas.getContext('2d');
-				canvas.width = this.naturalWidth;
-				canvas.height = this.naturalHeight;
-				ctx.drawImage(this, 0, 0);
+			// Check file size with HEAD request before downloading
+			fetch(imageUrl, { 
+				method: 'HEAD',
+				signal: AbortSignal.timeout(1200) // 1.2 second timeout
+			})
+			.then(response => {
+				const contentLength = response.headers.get('content-length');
 				
-				// Get data URL and estimate size
-				const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-				const estimatedSize = dataUrl.length * 0.75; // Rough byte estimate
-				
-				if (estimatedSize < 50000) { // 50KB limit
-					// Create avatar image
-					const avatar = document.createElement('img');
-					avatar.src = imageUrl;
-					avatar.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; margin-right: 8px; vertical-align: middle;';
-					avatar.alt = 'Profile photo';
-					
-					// Insert before the name text
-					authorElement.insertBefore(avatar, authorElement.firstChild);
+				if (contentLength && parseInt(contentLength) > 300000) {
+					logToConsole(`Avatar too large: ${Math.round(contentLength/1000)}kb`, 'warn');
+					return;
 				}
-			};
-			
-			tempImg.onerror = function() {
-				// Fail silently - CORS errors are expected in browser environment
-			};
-			
-			tempImg.src = imageUrl;
+				
+				// Size is acceptable, now create and load the avatar
+				const avatar = document.createElement('img');
+				avatar.src = imageUrl;
+				avatar.style.cssText = 'width: 50px; height: 50px; border-radius: 50%; margin-right: 8px; vertical-align: middle;';
+				avatar.alt = 'Profile photo';
+				avatar.crossOrigin = 'anonymous';
+				avatar.referrerPolicy = 'no-referrer';
+				avatar.loading = 'lazy';
+				
+				avatar.onerror = function() { 
+					this.style.display = 'none'; 
+					this.remove();
+				};
+				
+				// Insert before the name text
+				authorElement.insertBefore(avatar, authorElement.firstChild);
+			})
+			.catch(error => {
+				// Fail silently - network errors or timeouts are expected
+				logToConsole(`Avatar check failed: ${error.message}`, 'warn');
+			});
 		}
 
 		function escapeHtml(text) {
