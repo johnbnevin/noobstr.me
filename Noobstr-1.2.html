@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Noobstr - Simple Nostr Client</title>
+	<title>Noobstr.me - The Read Only Nostr Noobstr Soft Landing Client</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='90' font-size='90'>🤙</text></svg>">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' wss: ws: https:;">
 	<style>
@@ -11,13 +11,14 @@
         :root { --bg-color: #ffffff; --text-color: #333333; --accent-orange: #ff6b35; --accent-purple: #7c3aed; --border-color: #e5e7eb; --card-bg: #f9fafb; --input-bg: #ffffff; --button-hover: #f3f4f6; }
         #sortOrder { flex-shrink: 0; min-width: 120px; }
 		@media (max-width: 768px) { .top-bar { flex-wrap: wrap; gap: 8px; padding: 8px 12px; } .input-group { width: 100%; min-width: unset; } .controls { flex-wrap: wrap; gap: 8px; } .logo { font-size: 20px; } .note { margin-left: 4px; margin-right: 4px; padding: 12px; } .main-content { padding: 12px 8px; padding-bottom: 120px; } .bottom-bar { font-size: 11px; gap: 4px; } }
+		@media (max-width: 480px) { .settings-item { flex-direction: column; } .settings-item input { margin-bottom: 4px; } .settings-item button { align-self: flex-start; min-width: 80px; } .settings-item button[onclick*="remove"] { min-width: 60px; } }
 		[data-theme="dark"] { --bg-color: #404040; --text-color: #ffffff; --border-color: #525252; --card-bg: #525252; --input-bg: #525252; --button-hover: #525252; }
 		[data-theme="clown"] { --bg-color: #7b1fa2; --text-color: #fff700; --accent-orange: #00ff00; --accent-purple: #ff1493; --border-color: #ff4500; --card-bg: #9400d3; --input-bg: #ff6347; --button-hover: #32cd32; }
 		body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: var(--bg-color); color: var(--text-color); transition: all 0.3s ease; }
-        input, select, button { padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 4px; background-color: var(--input-bg); color: var(--text-color); font-size: 14px; }
-        input { flex: 1; }
-        button { cursor: pointer; background-color: var(--input-bg); border: 1px solid var(--border-color); transition: background-color 0.2s; min-height: 44px; }
-        button:hover { background-color: var(--button-hover); }
+		input, select { padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 4px; background-color: var(--input-bg); color: var(--text-color); font-size: 14px; }
+		input { flex: 1; }
+		button { padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 4px; background-color: var(--input-bg); color: var(--text-color); font-size: 14px; cursor: pointer; transition: background-color 0.2s; min-height: 44px; }
+		button:hover { background-color: var(--button-hover); }
 		.settings-item button:last-child { background-color: #ef4444 !important; color: white !important; font-size: 12px !important; padding: 4px 8px !important; min-width: 60px !important; min-height: auto !important; }
 		.top-bar { position: sticky; top: 0; background-color: var(--bg-color); border-bottom: 1px solid var(--border-color); padding: 8px 12px; z-index: 100; }
         .logo { font-size: 24px; font-weight: bold; color: var(--accent-orange); }
@@ -29,7 +30,7 @@
         .control-group label { font-size: 14px; font-weight: 500; }
         .main-content { padding: 20px; max-width: 800px; margin: 0 auto; padding-bottom: 100px; }
         .note { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 16px; margin-left: 8px; margin-right: 8px; }
-		.note-header { display: flex; justify-content: between; margin-bottom: 8px; font-size: 14px; color: var(--accent-purple); }
+		.note-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 14px; color: var(--accent-purple); }
 		.note-content { line-height: 1.5; margin-bottom: 8px; word-break: break-word; overflow-wrap: break-word; font-size: 16px; }
 		.note-time { font-size: 12px; color: #6b7280; margin-left: 12px; }
 		.loading { text-align: center; padding: 20px; color: #6b7280; }
@@ -46,7 +47,6 @@
         .settings-section h4 { margin-bottom: 8px; font-size: 14px; color: var(--text-color); }
         .settings-item input { flex: 1; }
 		.settings-item { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
-		@media (max-width: 480px) { .settings-item { flex-direction: column; } .settings-item input { margin-bottom: 4px; } .settings-item button { align-self: flex-start; min-width: 80px; } .settings-item button[onclick*="remove"] { min-width: 60px; } }
 		.close { position: absolute; right: 10px; top: 10px; font-size: 28px; cursor: pointer; }
 		.empty-state { text-align: center; padding: 40px 20px; color: #6b7280; }
 		.message-banner { display: none; background-color: var(--accent-orange); color: white; padding: 3px 15px; position: relative; border-bottom: 1px solid var(--border-color); font-size: 12px; line-height: 1.2; }
@@ -70,42 +70,109 @@
 </head>
 
 <body>
-<div class="top-bar">
-    <div class="top-row">
-        <div class="logo">🤙 Noobstr</div>
-        <div style="display: flex; gap: 8px;">
-            <button class="icon-btn" onclick="openSettings()">⚙️</button>
-            <button class="icon-btn" onclick="toggleTheme()" id="themeBtn">🌙</button>
-        </div>
-    </div>
-    
-    <div class="input-group">
-        <input type="text" id="npubInput" placeholder="Enter npub or relay URL...">
-        <select id="savedSelector">
-            <option value="">Select saved...</option>
-        </select>
-    </div>
-    
-    <div style="margin-bottom: 4px;">
-        <button onclick="loadFeed()" style="background-color: var(--accent-orange); color: white; font-weight: bold; width: 100%;">Just Go!</button>
-    </div>
-    
-    <div class="controls-row">
-        <select id="sortOrder">
-            <option value="newest">↓ Newest</option>
-            <option value="oldest">↑ Oldest</option>
-        </select>
-        <label class="control-group">
-            <input type="checkbox" id="slowConnection"> Slow connection?
-        </label>
-    </div>
+	<div class="top-bar">
+		<div class="top-row">
+			<div class="logo">🤙 Noobstr</div>
+			<div style="display: flex; gap: 8px;">
+				<button class="icon-btn" onclick="openSettings()">⚙️</button>
+				<button class="icon-btn" onclick="toggleTheme()" id="themeBtn">🌙</button>
+			</div>
+		</div>
+		
+		<div class="input-group">
+			<input type="text" id="npubInput" placeholder="Enter npub or relay URL...">
+			<select id="savedSelector">
+				<option value="">Select saved...</option>
+			</select>
+		</div>
+		
+		<div id="settingsModal" class="modal">
+			<div class="modal-content">
+				<span class="close" onclick="closeSettings()">&times;</span>
+				<h3>Settings</h3>
+				
+				<p style="margin-bottom: 20px; color: #6b7280; font-size: 14px; line-height: 1.4;">Save frequently-used npubs and relay URLs here. Once saved, they'll appear in the "Select saved..." dropdown for one-click access. All data is stored locally on your device.</p>
+				
+				<div class="settings-section">
+					<h4>Saved Npubs</h4>
+					<div id="npubsList"></div>
+					<div class="settings-item">
+						<input type="text" id="newNpubName" placeholder="Name">
+						<input type="text" id="newNpubValue" placeholder="npub...">
+						<button onclick="addNpub()">Add New Npub</button>
+					</div>
+				</div>
 
-	<div id="messageBanner" class="message-banner">
-		<span id="bannerText"></span>
-		<button id="bannerClose" class="banner-close">&times;</button>
+				<div class="settings-section">
+					<h4>Saved Relays</h4>
+					<div id="relaysList"></div>
+					<div class="settings-item">
+						<input type="text" id="newRelayName" placeholder="Name">
+						<input type="text" id="newRelayValue" placeholder="wss://..." value="wss://">
+						<button onclick="addRelay()">Add New Relay</button>
+					</div>
+				</div>
+
+				<div class="settings-section">
+					<h4>Need Help Finding Npubs & Relays?</h4>
+					<p style="font-size: 13px; color: #6b7280; margin-bottom: 12px; line-height: 1.4;">
+						<strong>Npubs:</strong> Find NOSTRiches with good follow lists at <a href="https://nostr.directory" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange);">nostr.directory</a> <br>
+						<strong>Relays:</strong> Find NOSTR public relays at <a href="https://nostr.watch" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange);">nostr.watch</a>
+					</p>
+					<p style="font-size: 13px; color: #6b7280; margin-bottom: 8px;">
+						Ready for the full Nostr experience?  Learn how to post, reply, and zap Bitcoin now:<br>
+						<a href="https://nostr.how" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); font-weight: bold;">Nostr.how</a> | <a href="https://nostr.com/ " target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); font-weight: bold;">Nostr.com</a> | <a href="https://grownostr.org/get-started.html" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); font-weight: bold;">GrowNostr.org</a>
+					</p>
+				</div>
+			</div>
+		</div>
+
+		<div id="helpModal" class="modal">
+			<div class="modal-content">
+				<span class="close" onclick="closeHelpModal()">&times;</span>
+				<h3>How to Use Noobstr</h3>
+				
+				<div class="settings-section">
+					<h4>Quick Start</h4>
+					<p><strong>Just Go!</strong> - Loads a demo feed to see how Nostr works</p>
+				</div>
+
+				<div class="settings-section">
+					<h4>Advanced Options</h4>
+					<p><strong>npub</strong> - Enter someone's npub to see who they follow</p>
+					<p><strong>Relay URL</strong> - Enter wss://relay.example.com to see all recent notes from that relay</p>
+					<p><strong>Sort Order</strong> - Newest first or oldest first</p>
+					<p><strong>Slow Connection</strong> - Check this on old phones or slow internet</p>
+				</div>
+
+				<div class="settings-section">
+					<h4>Saving Favorites</h4>
+					<p>Use the Settings gear to save your favorite npubs and relays for quick access.</p>
+				</div>
+			</div>
+		</div>
+		
+		<div style="margin-bottom: 4px;">
+			<button onclick="loadFeed()" style="background-color: var(--accent-orange); color: white; font-weight: bold; width: 100%;">Just Go!</button>
+		</div>
+		
+		<div class="controls-row">
+			<select id="sortOrder">
+				<option value="newest">↓ Newest</option>
+				<option value="oldest">↑ Oldest</option>
+			</select>
+			<label class="control-group">
+				<input type="checkbox" id="slowConnection"> Slow connection?
+			</label>
+		</div>
+
+		<div id="messageBanner" class="message-banner">
+			<span id="bannerText"></span>
+			<button id="bannerClose" class="banner-close">&times;</button>
+		</div>
 	</div>
 
-    <div class="main-content">
+	<div class="main-content">
 		<div class="console-banner" id="consoleBanner">
 			<div class="console-header" onclick="toggleConsoleLog()">
 				<span>🔧 Debugger: <span id="latestMessage">Ready...</span></span>
@@ -113,95 +180,27 @@
 			</div>
 			<div class="console-content" id="consoleContent"></div>
 		</div>
-	
-        <div id="feedContainer">
-            <div class="empty-state">
-                <h3>Welcome, Noobstr!</h3>
-                <p>Click the 'Just Go!' button to see what's on NOSTR!</p>
+
+		<div id="feedContainer">
+			<div class="empty-state">
+				<h3>Welcome, Noobstr!</h3>
+				<p>Click the 'Just Go!' button to see what's on NOSTR!</p>
 				<p>Enter an npub to see notes from their followers, or enter a relay URL to see notes from that relay.</p>
-            </div>
-        </div>
-    </div>
-
-    <div class="bottom-bar">
-        <div class="bottom-links">
-            <span>Ready for the full Nostr experience?  Learn how to post, reply, and zap Bitcoin now:<br>
-			<a href="https://nostr.how" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); font-weight: bold;">Nostr.how</a> | <a href="https://nostr.com/ " target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); font-weight: bold;">Nostr.com</a> | <a href="https://grownostr.org/get-started.html" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); font-weight: bold;">GrowNostr.org</a></span>
-        </div>
-        <div class="bottom-links">
-            <span><a href="https://coinos.io/pay/jbnevin">Vibecoded with ♥</a></span>
-        </div>
-    </div>
-
-    <!-- Settings Modal -->
-    <div id="settingsModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeSettings()">&times;</span>
-            <h3>Settings</h3>
-            
-			<p style="margin-bottom: 20px; color: #6b7280; font-size: 14px; line-height: 1.4;">Save frequently-used npubs and relay URLs here. Once saved, they'll appear in the "Select saved..." dropdown for one-click access. All data is stored locally on your device.</p>
-			
-            <div class="settings-section">
-                <h4>Saved Npubs</h4>
-                <div id="npubsList"></div>
-                <div class="settings-item">
-                    <input type="text" id="newNpubName" placeholder="Name">
-                    <input type="text" id="newNpubValue" placeholder="npub...">
-                    <button onclick="addNpub()">Add New Npub</button>
-                </div>
-            </div>
-
-			<div class="settings-section">
-							<h4>Saved Relays</h4>
-							<div id="relaysList"></div>
-							<div class="settings-item">
-								<input type="text" id="newRelayName" placeholder="Name">
-								<input type="text" id="newRelayValue" placeholder="wss://..." value="wss://">
-								<button onclick="addRelay()">Add New Relay</button>
-							</div>
-						</div>
-
-						<div class="settings-section">
-							<h4>Need Help Finding Npubs & Relays?</h4>
-							<p style="font-size: 13px; color: #6b7280; margin-bottom: 12px; line-height: 1.4;">
-								<strong>Npubs:</strong> Find NOSTRiches with good follow lists at <a href="https://nostr.directory" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange);">nostr.directory</a> <br>
-								<strong>Relays:</strong> Find NOSTR public relays at <a href="https://nostr.watch" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange);">nostr.watch</a>
-							</p>
-							<p style="font-size: 13px; color: #6b7280; margin-bottom: 8px;">
-								Ready for the full Nostr experience?  Learn how to post, reply, and zap Bitcoin now:<br>
-								<a href="https://nostr.how" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); font-weight: bold;">Nostr.how</a> | <a href="https://nostr.com/ " target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); font-weight: bold;">Nostr.com</a> | <a href="https://grownostr.org/get-started.html" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); font-weight: bold;">GrowNostr.org</a>
-							</p>
-						</div>
-					</div>
-				</div>
-	
-		<!-- Help Modal -->
-	<div id="helpModal" class="modal">
-		<div class="modal-content">
-			<span class="close" onclick="closeHelpModal()">&times;</span>
-			<h3>How to Use Noobstr</h3>
-			
-			<div class="settings-section">
-				<h4>Quick Start</h4>
-				<p><strong>Just Go!</strong> - Loads a demo feed to see how Nostr works</p>
-			</div>
-
-			<div class="settings-section">
-				<h4>Advanced Options</h4>
-				<p><strong>npub</strong> - Enter someone's npub to see who they follow</p>
-				<p><strong>Relay URL</strong> - Enter wss://relay.example.com to see all recent notes from that relay</p>
-				<p><strong>Sort Order</strong> - Newest first or oldest first</p>
-				<p><strong>Slow Connection</strong> - Check this on old phones or slow internet</p>
-			</div>
-
-			<div class="settings-section">
-				<h4>Saving Favorites</h4>
-				<p>Use the Settings gear to save your favorite npubs and relays for quick access.</p>
 			</div>
 		</div>
 	</div>
 
-    <script>
+	<div class="bottom-bar">
+		<div class="bottom-links">
+			<span>Ready for the full Nostr experience?  Learn how to post, reply, and zap Bitcoin now:<br>
+			<a href="https://nostr.how" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); font-weight: bold;">Nostr.how</a> | <a href="https://nostr.com/ " target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); font-weight: bold;">Nostr.com</a> | <a href="https://grownostr.org/get-started.html" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); font-weight: bold;">GrowNostr.org</a></span>
+		</div>
+		<div class="bottom-links">
+			<span><a href="https://coinos.io/pay/jbnevin">Vibecoded with ♥</a></span>
+		</div>
+	</div>
+
+	<script>
         let currentFeed = [];
         let currentType = null;
         let currentValue = null;
@@ -236,10 +235,10 @@
 			
 			// Add to beginning of array with sanitized message
 			consoleEntries.unshift({ message: sanitizedMessage, type, timestamp });
-			
-			// Limit array size - but use splice for better performance
+
+			// Properly limit array size to prevent memory leak
 			if (consoleEntries.length > MAX_CONSOLE_ENTRIES) {
-				consoleEntries.splice(MAX_CONSOLE_ENTRIES);
+				consoleEntries.length = MAX_CONSOLE_ENTRIES;
 			}
 			
 			// Show the consolebanner and update latest message
@@ -816,15 +815,19 @@
 			isProcessingImages = true;
 			
 			while (imageProcessingQueue.length > 0) {
-				const { url, noteElement } = imageProcessingQueue.shift();
+				const batch = [];
 				
-				try {
-					await checkAndRenderImage(url, noteElement);
-					// Small delay to prevent overwhelming the browser
-					await new Promise(resolve => setTimeout(resolve, 100));
-				} catch (error) {
-					logToConsole(`Failed to process image: ${error.message}`, 'error');
+				// Process up to 3 images at once
+				for (let i = 0; i < 3 && imageProcessingQueue.length > 0; i++) {
+					const item = imageProcessingQueue.shift();
+					batch.push(checkAndRenderImage(item.url, item.noteElement));
 				}
+				
+				// Process this batch
+				await Promise.allSettled(batch);
+				
+				// Small delay to prevent browser lockup on weak devices
+				await new Promise(resolve => setTimeout(resolve, 200));
 			}
 			
 			isProcessingImages = false;
@@ -832,24 +835,46 @@
 
 		async function checkAndRenderImage(imageUrl, noteElement) {
 			try {
-				// NEW: Basic URL validation
+				// Strict domain validation - only allow nostr.build
 				try {
 					const validUrl = new URL(imageUrl);
 					if (validUrl.protocol !== 'https:' && validUrl.protocol !== 'http:') {
-						return; // Skip unsafe protocols silently
+						logToConsole(`Blocked non-HTTP protocol: ${validUrl.protocol}`, 'warn');
+						return;
+					}
+					
+					// Only allow nostr.build domain
+					if (!validUrl.hostname.endsWith('nostr.build')) {
+						logToConsole(`Blocked non-nostr.build domain: ${validUrl.hostname}`, 'warn');
+						return;
 					}
 				} catch (e) {
-					return; // Skip malformed URLs silently
+					logToConsole(`Malformed image URL blocked`, 'warn');
+					return;
 				}
 				
-				logToConsole(`Checking image: ${imageUrl.slice(-20)}...`);
+				logToConsole(`Checking nostr.build image: ${imageUrl.slice(-20)}...`);
 				
-				// Head request to check file size
-				const response = await fetch(imageUrl, { method: 'HEAD' });
-				const contentLength = response.headers.get('content-length');
+				// Head request to check file size with timeout
+				const controller = new AbortController();
+				const timeoutId = setTimeout(() => controller.abort(), 3000);
 				
-				if (contentLength && parseInt(contentLength) > 300000) {
-					logToConsole(`Image too large: ${Math.round(contentLength/1000)}kb`, 'warn');
+				try {
+					const response = await fetch(imageUrl, { 
+						method: 'HEAD', 
+						signal: controller.signal 
+					});
+					clearTimeout(timeoutId);
+					
+					const contentLength = response.headers.get('content-length');
+					
+					if (contentLength && parseInt(contentLength) > 300000) {
+						logToConsole(`Image too large: ${Math.round(contentLength/1000)}kb`, 'warn');
+						return;
+					}
+				} catch (fetchError) {
+					clearTimeout(timeoutId);
+					logToConsole(`Failed to check image size: ${fetchError.message}`, 'warn');
 					return;
 				}
 				
@@ -869,7 +894,7 @@
 					img.src = ''; // Cancel loading
 					img.remove(); // Remove from DOM
 					logToConsole(`Image load timeout: ${imageUrl.slice(-20)}...`, 'warn');
-				}, 1000); // 1 second timeout
+				}, 5000); // 5 second timeout for actual image loading
 				
 				img.onload = () => {
 					clearTimeout(loadTimeout);
@@ -918,16 +943,13 @@
 			// Create the escape handler function
 			const escapeHandler = (e) => {
 				if (e.key === 'Escape') {
-					closeLightbox(lightbox);
+					closeLightbox(lightbox, escapeHandler);
 				}
 			};
 			
-			// Store the handler so we can remove it later
-			lightbox.escapeHandler = escapeHandler;
-			
 			// Create a unified close function that always cleans up properly
 			const closeLightboxSafely = () => {
-				closeLightbox(lightbox);
+				closeLightbox(lightbox, escapeHandler);
 			};
 			
 			// Assign the same cleanup function to all close triggers
@@ -944,10 +966,10 @@
 			document.addEventListener('keydown', escapeHandler);
 		}
 
-		function closeLightbox(lightbox) {
+		function closeLightbox(lightbox, escapeHandler) {
 			// Remove the escape key listener to prevent memory leak
-			if (lightbox.escapeHandler) {
-				document.removeEventListener('keydown', lightbox.escapeHandler);
+			if (escapeHandler) {
+				document.removeEventListener('keydown', escapeHandler);
 			}
 			
 			lightbox.style.display = 'none';
@@ -1256,9 +1278,13 @@
 				
 				loadNpubFeed(defaultNpub);
 				
-				// Show info about what they're viewing
+				// Show info about what they're viewing (only if no alert exists yet)
 				setTimeout(() => {
-					showDefaultFeedInfo();
+					const container = document.getElementById('feedContainer');
+					const existingAlert = container.querySelector('[data-demo-alert="true"]');
+					if (!existingAlert) {
+						showDefaultFeedInfo();
+					}
 				}, 2000);
 				return;
 			}
@@ -1295,27 +1321,49 @@
 				logToConsole("📨 RAW MESSAGE FROM RELAY: " + logData);
 				
 				try {
-					const message = JSON.parse(event.data);
-					
-					// Validate message structure before accessing
-					if (!Array.isArray(message) || message.length < 1) {
-						logToConsole("🚫 Invalid message format: not a proper array", 'error');
+					// Size limit check before parsing
+					if (typeof event.data === 'string' && event.data.length > 100000) {
+						logToConsole("🚫 Message too large, rejecting", 'error');
 						return;
 					}
 					
-					// Validate message type is a string
-					if (typeof message[0] !== 'string') {
+					const message = JSON.parse(event.data);
+					
+					// Strict message structure validation
+					if (!Array.isArray(message) || message.length < 2) {
+						logToConsole("🚫 Invalid message format: not a proper array with minimum elements", 'error');
+						return;
+					}
+					
+					// Validate message type is string and allowed
+					const messageType = message[0];
+					if (typeof messageType !== 'string') {
 						logToConsole("🚫 Invalid message type: not a string", 'error');
 						return;
+					}
+					
+					// Only allow expected Nostr message types
+					const allowedTypes = ['EVENT', 'EOSE', 'NOTICE', 'OK'];
+					if (!allowedTypes.includes(messageType)) {
+						logToConsole("🚫 Unknown message type: " + messageType, 'error');
+						return;
+					}
+					
+					// Validate subscription ID format
+					if (messageType === 'EVENT' || messageType === 'EOSE') {
+						if (typeof message[1] !== 'string' || message[1].length > 100) {
+							logToConsole("🚫 Invalid subscription ID", 'error');
+							return;
+						}
 					}
 					
 					// Sanitize log output to prevent log injection
 					const sanitizedMessage = JSON.stringify(message).substring(0, 300).replace(/[<>&"']/g, '');
 					logToConsole("📨 PARSED MESSAGE: " + sanitizedMessage);
-					logToConsole("📨 MESSAGE TYPE: " + message[0]);
+					logToConsole("📨 MESSAGE TYPE: " + messageType);
 					
-					if (message[0] === "EVENT") {
-						// Validate array has enough elements
+					if (messageType === "EVENT") {
+						// Validate EVENT message structure
 						if (message.length < 3) {
 							logToConsole("🚫 EVENT message missing required elements", 'error');
 							return;
@@ -1323,7 +1371,89 @@
 						
 						const noteData = message[2];
 						
-						// VALIDATE EVENT FIRST
+						// Strict event data validation
+						if (!noteData || typeof noteData !== 'object') {
+							logToConsole("🚫 EVENT data is not an object", 'error');
+							return;
+						}
+						
+						// Validate all required fields exist and have correct types
+						const requiredStringFields = ['id', 'pubkey', 'content', 'sig'];
+						for (const field of requiredStringFields) {
+							if (!noteData.hasOwnProperty(field) || typeof noteData[field] !== 'string') {
+								logToConsole("🚫 EVENT missing or invalid field: " + field, 'error');
+								return;
+							}
+						}
+						
+						// Validate numeric fields
+						if (!noteData.hasOwnProperty('created_at') || !Number.isInteger(noteData.created_at)) {
+							logToConsole("🚫 EVENT invalid created_at", 'error');
+							return;
+						}
+						
+						if (!noteData.hasOwnProperty('kind') || !Number.isInteger(noteData.kind)) {
+							logToConsole("🚫 EVENT invalid kind", 'error');
+							return;
+						}
+						
+						// Validate tags is array
+						if (!noteData.hasOwnProperty('tags') || !Array.isArray(noteData.tags)) {
+							logToConsole("🚫 EVENT invalid tags", 'error');
+							return;
+						}
+						
+						// Size limits on critical fields
+						if (noteData.id.length !== 64 || noteData.pubkey.length !== 64 || noteData.sig.length !== 128) {
+							logToConsole("🚫 EVENT invalid field lengths", 'error');
+							return;
+						}
+						
+						if (noteData.content.length > 50000) {
+							logToConsole("🚫 EVENT content too long", 'error');
+							return;
+						}
+						
+						// Validate hex format for critical fields
+						const hexRegex = /^[a-f0-9]+$/i;
+						if (!hexRegex.test(noteData.id) || !hexRegex.test(noteData.pubkey) || !hexRegex.test(noteData.sig)) {
+							logToConsole("🚫 EVENT invalid hex format", 'error');
+							return;
+						}
+						
+						// Validate kind range
+						if (noteData.kind < 0 || noteData.kind > 65535) {
+							logToConsole("🚫 EVENT kind out of range", 'error');
+							return;
+						}
+						
+						// Validate timestamp is reasonable (not too far in past/future)
+						const now = Math.floor(Date.now() / 1000);
+						if (noteData.created_at < now - (365 * 24 * 60 * 60) || noteData.created_at > now + (24 * 60 * 60)) {
+							logToConsole("🚫 EVENT timestamp unreasonable", 'error');
+							return;
+						}
+						
+						// Validate tags array structure
+						if (noteData.tags.length > 1000) {
+							logToConsole("🚫 EVENT too many tags", 'error');
+							return;
+						}
+						
+						for (const tag of noteData.tags) {
+							if (!Array.isArray(tag) || tag.length === 0 || tag.length > 10) {
+								logToConsole("🚫 EVENT invalid tag structure", 'error');
+								return;
+							}
+							for (const tagElement of tag) {
+								if (typeof tagElement !== 'string' || tagElement.length > 1000) {
+									logToConsole("🚫 EVENT invalid tag element", 'error');
+									return;
+								}
+							}
+						}
+						
+						// VALIDATE EVENT FIRST with existing function
 						if (!validateEventFormat(noteData)) {
 							logToConsole("🚫 Rejecting invalid event from relay", 'error');
 							return;
@@ -1354,13 +1484,13 @@
 					}
 					
 					// Handle follows list (only for npub feeds)
-					if (feedType === 'npub' && message[0] === "EVENT" && message.length >= 3 && message[2] && typeof message[2] === 'object' && message[2].kind === 3) {
+					if (feedType === 'npub' && messageType === "EVENT" && message.length >= 3 && message[2] && typeof message[2] === 'object' && message[2].kind === 3) {
 						const followsEvent = message[2];
 						logToConsole("📋 Got follows list!");
 						
 						const followedPubkeys = [];
 						followsEvent.tags.forEach(tag => {
-							if (tag[0] === 'p') {
+							if (tag[0] === 'p' && tag.length >= 2 && typeof tag[1] === 'string' && tag[1].length === 64) {
 								followedPubkeys.push(tag[1]);
 							}
 						});
@@ -1388,7 +1518,7 @@
 						relay.send(JSON.stringify(notesRequest));
 					}
 					
-					if (message[0] === "EOSE") {
+					if (messageType === "EOSE") {
 						// Validate EOSE message has subscription ID
 						if (message.length < 2 || typeof message[1] !== 'string') {
 							logToConsole("🚫 Invalid EOSE message format", 'error');
@@ -1406,7 +1536,7 @@
 							logToConsole("📊 Current count: " + realNotes.length + " notes");
 							
 							if (realNotes.length < 100 && currentLimit < 2000) {
-								logToConsole("🔄 Need more notes, increasing limit and trying again");
+								logToConsole("🔥 Need more notes, increasing limit and trying again");
 								currentLimit = currentLimit + 200;
 								
 								const requestId = feedType === 'npub' ? "get-more-notes" : "get-more-relay-notes";
@@ -1434,13 +1564,13 @@
 							displayFeed(realNotes);
 							setLoading(false);
 							relay.close();
-							logToConsole("🔌 Connection closed - stopping at " + realNotes.length + " notes");
+							logToConsole("📌 Connection closed - stopping at " + realNotes.length + " notes");
 						}
 					}
 					
-					if (message[0] === "NOTICE") {
+					if (messageType === "NOTICE") {
 						// Validate NOTICE message and sanitize content
-						if (message.length >= 2 && typeof message[1] === 'string') {
+						if (message.length >= 2 && typeof message[1] === 'string' && message[1].length < 1000) {
 							const sanitizedNotice = message[1].substring(0, 200).replace(/[<>&"']/g, '');
 							logToConsole("📢 RELAY NOTICE: " + sanitizedNotice);
 							showError("Relay notice: " + sanitizedNotice);
@@ -1451,7 +1581,7 @@
 					
 				} catch (e) {
 					// Don't log the full error message (could contain sensitive data)
-					logToConsole("💥 FAILED TO PARSE MESSAGE: Invalid JSON", 'error');
+					logToConsole("💥 FAILED TO PARSE MESSAGE: Invalid JSON or processing error", 'error');
 				}
 			};
 		}
@@ -1490,6 +1620,10 @@
 				
 				const relay = await connectToRelay();
 
+				// Store this working relay connection for potential reuse
+				window.lastWorkingRelay = relay;
+				window.lastRelayUrl = relay.url;
+
 				// Relay is already connected, so send the request immediately
 				logToConsole("🎉 Connected to get follows list", 'success');
 
@@ -1507,14 +1641,16 @@
 				relay.send(JSON.stringify(followsRequest));
 
 				relay.onmessage = createSecureMessageHandler('npub', realNotes, relay, someFollows, since, currentLimit);
-				
+
 				relay.onerror = function(error) {
+					// Clear the cached connection if it fails
+					window.lastWorkingRelay = null;
+					window.lastRelayUrl = null;
 					showError('Relay connection lost during operation.');
 					setLoading(false);
 				};
 				
 			} catch (error) {
-				if (timeout) clearTimeout(timeout);
 				showError('Failed to load npub feed: ' + error.message);
 				setLoading(false);
 			}
@@ -1624,8 +1760,6 @@
 			
 			setLoading(true);
 			
-			let topLevelNotesCount = 0;
-			const targetNotes = 100;
 			let currentLimit = 200; // Start with this many notes per request
 			const realNotes = []; 			
 			let since = 0; 
@@ -1730,14 +1864,21 @@
 				currentType === 'npub' && 
 				currentValue === 'npub1v89nr2zax8ef0ceyu9te0sjyqv3newa3e82m0rd4kye3ekeyhv2sqf30cc';
 
-			// Clear all children
-			while (container.firstChild) {
-				container.removeChild(container.firstChild);
-			}
-
-			// Put demo alert back if we should preserve it
-			if (shouldPreserveDemoAlert) {
-				container.appendChild(existingDemoAlert);
+			// Fast clear with fallback for older browsers
+			if (container.replaceChildren) {
+				// Modern browsers (2020+) - fast and secure
+				container.replaceChildren();
+				if (shouldPreserveDemoAlert) {
+					container.appendChild(existingDemoAlert);
+				}
+			} else {
+				// Fallback for older browsers - slower but works everywhere
+				while (container.firstChild) {
+					container.removeChild(container.firstChild);
+				}
+				if (shouldPreserveDemoAlert) {
+					container.appendChild(existingDemoAlert);
+				}
 			}
 			
 			// Clear image processing state
@@ -1965,11 +2106,26 @@
 			
 			logToConsole(`🔍 Looking up ${pubkeysToFetch.length} unique authors`);
 			
-			// Connect to relay to fetch profiles
-			const relay = new WebSocket('wss://relay.damus.io');
-			
-			relay.onopen = function() {
-				logToConsole("👤 Connected for profile lookups");
+			// Try to reuse existing connection, otherwise create new one
+			let relay = null;
+			let shouldCloseRelay = false;
+
+			if (window.lastWorkingRelay && 
+				window.lastWorkingRelay.readyState === WebSocket.OPEN && 
+				window.lastRelayUrl && 
+				window.lastRelayUrl.includes('damus.io')) {
+				
+				logToConsole("♻️ Reusing existing relay connection for profiles");
+				relay = window.lastWorkingRelay;
+				shouldCloseRelay = false; // Don't close shared connection
+			} else {
+				logToConsole("🔌 Creating new relay connection for profiles");
+				relay = new WebSocket('wss://relay.damus.io');
+				shouldCloseRelay = true; // Close our own connection when done
+			}
+
+			const sendProfileRequest = function() {
+				logToConsole("👤 Requesting profiles");
 				
 				// Request profiles (kind 0 events)
 				const profileRequest = [
@@ -1984,6 +2140,12 @@
 				
 				relay.send(JSON.stringify(profileRequest));
 			};
+
+			if (relay.readyState === WebSocket.OPEN) {
+				sendProfileRequest();
+			} else {
+				relay.onopen = sendProfileRequest;
+			}
 			
 			relay.onmessage = function(event) {
 				const message = JSON.parse(event.data);
@@ -2057,8 +2219,13 @@
 							}
 						});
 						
-						// UPDATE ONLY THE DOM ELEMENTS for this pubkey - more efficient
+						// UPDATE ONLY THE DOM ELEMENTS for this pubkey - batch DOM updates for better performance
 						const authorElements = document.querySelectorAll(`[data-pubkey="${pubkey}"]`);
+
+						// Use DocumentFragment to batch DOM changes
+						const fragment = document.createDocumentFragment();
+						let needsFragmentUpdate = false;
+
 						authorElements.forEach(element => {
 							// Update the text content
 							element.textContent = displayName;
@@ -2069,11 +2236,14 @@
 								avatar.src = safeAvatarUrl;
 								avatar.style.cssText = 'width: 50px; height: 50px; border-radius: 50%; margin-right: 8px; vertical-align: middle;';
 								avatar.alt = 'Profile photo';
-								// NEW: Add security attributes
 								avatar.crossOrigin = 'anonymous';
 								avatar.referrerPolicy = 'no-referrer';
 								avatar.loading = 'lazy';
-								avatar.onerror = function() { this.style.display = 'none'; };
+								avatar.onerror = function() { 
+									this.style.display = 'none'; 
+									// Clean up the failed image element
+									this.remove();
+								};
 								element.insertBefore(avatar, element.firstChild);
 							}
 						});
@@ -2085,14 +2255,18 @@
 				
 				if (message[0] === "EOSE") {
 					logToConsole("✅ Done fetching profiles");
-					relay.close();
+					if (shouldCloseRelay) {
+						relay.close();
+					}
 					isLookingUpUsernames = false;
 				}
 			};
 			
 			relay.onerror = function(error) {
 				logToConsole("❌ Profile lookup failed: " + error);
-				relay.close();
+				if (shouldCloseRelay) {
+					relay.close();
+				}
 				isLookingUpUsernames = false;
 			};
 		}
@@ -2108,23 +2282,27 @@
 			
 			const br = document.createElement('br');
 			
-			const description = document.createTextNode('This shows recent notes from people followed by a Nostr vibecoder. Note: NOSTR is uncensored.  Use at your own risk, and be careful clicking links.');
+			const description = document.createTextNode('This shows recent notes from people followed by a Nostr vibecoder who tries to follow real, interesting people. That said, NOSTR is uncensored, so use at your own risk, and be careful clicking links.');
 			
 			const learnBtn = document.createElement('button');
 			learnBtn.textContent = 'Learn More';
-			learnBtn.style.cssText = 'margin-left: 8px; padding: 4px 8px; border: none; background: #3b82f6; color: white; border-radius: 4px; cursor: pointer;';
+			learnBtn.style.cssText = 'padding: 2px 6px; border: none; background: #3b82f6; color: white; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 4px; min-height: auto;';
 			learnBtn.onclick = openHelpModal;
-			
+
 			const dismissBtn = document.createElement('button');
 			dismissBtn.textContent = 'Dismiss';
-			dismissBtn.style.cssText = 'margin-left: 4px; padding: 4px 8px; border: none; background: #6b7280; color: white; border-radius: 4px; cursor: pointer;';
-			dismissBtn.onclick = function() { this.parentElement.remove(); };
-			
+			dismissBtn.style.cssText = 'padding: 2px 6px; border: none; background: #6b7280; color: white; border-radius: 4px; cursor: pointer; font-size: 12px; min-height: auto;';
+			dismissBtn.onclick = function() { infoDiv.remove(); };
+
+			const buttonContainer = document.createElement('div');
+			buttonContainer.style.cssText = 'margin-top: 8px;';
+			buttonContainer.appendChild(learnBtn);
+			buttonContainer.appendChild(dismissBtn);
+
 			infoDiv.appendChild(strongText);
 			infoDiv.appendChild(br);
 			infoDiv.appendChild(description);
-			infoDiv.appendChild(learnBtn);
-			infoDiv.appendChild(dismissBtn);
+			infoDiv.appendChild(buttonContainer);
 			
 			// Insert at the top of the feed container
 			container.insertBefore(infoDiv, container.firstChild);
@@ -2203,12 +2381,11 @@
 		}
 
 		function escapeHtml(text) {
-			// NEW: Input validation and length limits
+			// Input validation and length limits
 			if (typeof text !== 'string') {
 				return document.createTextNode('[Invalid content type]');
 			}
 			
-			// NEW: Limit text length to prevent memory exhaustion attacks
 			if (text.length > 50000) {
 				text = text.substring(0, 50000) + '... [content truncated for security]';
 			}
@@ -2216,34 +2393,61 @@
 			// Create a container div to hold all content
 			const container = document.createElement('div');
 			
-			// NEW: More restrictive URL regex to prevent edge cases
-			const urlRegex = /(https?:\/\/[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]\.[a-zA-Z]{2,}(?:\/[^\s<>"'\[\]{}|\\^`]*)?)/gi;
+			// Whitelist of allowed domains with their labels
+			const allowedDomains = {
+				'youtube.com': 'video',
+				'youtu.be': 'video',
+				'twitter.com': 'social',
+				'x.com': 'social',
+				'instagram.com': 'social',
+				'tiktok.com': 'video',
+				'reddit.com': 'social',
+				'linkedin.com': 'social',
+				'imgur.com': 'image',
+				'giphy.com': 'image',
+				'nostr.build': 'image',
+				'github.com': 'dev',
+				'gitlab.com': 'dev',
+				'njump.me': 'nostr',
+				'nostr.band': 'nostr',
+				'nostrudel.ninja': 'nostr',
+				'spotify.com': 'music',
+				'soundcloud.com': 'music',
+				'tidal.com': 'music',
+				'blossom.primal.net': 'media',
+				'cornychat.com': 'audio conference',
+				'hivetalk.org': 'video conference',
+				'zap.stream': 'livestream video',
+				'fountain.fm': 'media',
+				'nostrmedia.com': 'media'
+			};
+			
+			// Simple URL regex - only matches http/https
+			const urlRegex = /(https?:\/\/[^\s<>"'\[\]{}|\\^`]+)/gi;
 			const parts = text.split(urlRegex);
 			
 			for (let i = 0; i < parts.length; i++) {
 				const part = parts[i];
 				
-				// Check if this part is a URL
 				if (part.match(urlRegex)) {
 					try {
 						const urlObj = new URL(part);
 						
-						// SECURITY: Only allow safe protocols
+						// Only allow HTTP/HTTPS
 						if (urlObj.protocol !== 'https:' && urlObj.protocol !== 'http:') {
-							// Treat as plain text if protocol is unsafe
 							const textNode = document.createTextNode(part);
 							container.appendChild(textNode);
 							continue;
 						}
 						
-						// NEW: Additional URL safety checks
-						if (urlObj.hostname.length > 100 || urlObj.pathname.length > 500) {
+						// Safety checks
+						if (urlObj.hostname.length > 100 || part.length > 2000) {
 							const textNode = document.createTextNode('[suspicious URL blocked]');
 							container.appendChild(textNode);
 							continue;
 						}
 						
-						// Create safe link element
+						// Create link element
 						const linkElement = document.createElement('a');
 						linkElement.href = part;
 						linkElement.target = '_blank';
@@ -2251,73 +2455,41 @@
 						linkElement.style.color = 'var(--accent-orange)';
 						linkElement.style.textDecoration = 'underline';
 						
-						// Determine link type for display
-						const domain = urlObj.hostname.replace(/^www\./, '');
-						const path = urlObj.pathname.toLowerCase();
+						// Check if domain is in whitelist
+						const domain = urlObj.hostname.replace(/^www\./, '').toLowerCase();
+						let linkType = 'unknown web';
 						
-						let linkType = 'web';
-						
-						// Video platforms
-						if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
-							linkType = 'video';
-						} else if (domain.includes('rumble.com') || domain.includes('vimeo.com') || domain.includes('twitch.tv')) {
-							linkType = 'video';
-						} else if (domain.includes('tiktok.com') || domain.includes('instagram.com') && path.includes('/reel')) {
-							linkType = 'video';
-						}
-						// Music platforms
-						else if (domain.includes('spotify.com') || domain.includes('tidal.com') || domain.includes('apple.com') && path.includes('music')) {
-							linkType = 'music';
-						} else if (domain.includes('soundcloud.com') || domain.includes('bandcamp.com')) {
-							linkType = 'music';
-						}
-						// Social media
-						else if (domain.includes('twitter.com') || domain.includes('x.com')) {
-							linkType = 'social';
-						} else if (domain.includes('facebook.com') || domain.includes('instagram.com') || domain.includes('linkedin.com')) {
-							linkType = 'social';
-						}
-						// Media files
-						else if (part.match(/\.(mp4|mov|avi|mkv|webm)$/i)) {
-							linkType = 'video';
-						} else if (part.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) {
-							linkType = 'image';
-						} else if (part.match(/\.(pdf|doc|docx)$/i)) {
-							linkType = 'document';
-						} else if (part.match(/\.(mp3|wav|flac|m4a)$/i)) {
-							linkType = 'audio';
-						}
-						// News/articles
-						else if (domain.includes('reddit.com') || domain.includes('news.') || domain.includes('cnn.com') || domain.includes('bbc.')) {
-							linkType = 'news';
+						for (const [allowedDomain, label] of Object.entries(allowedDomains)) {
+							if (domain === allowedDomain || domain.endsWith('.' + allowedDomain)) {
+								linkType = label;
+								break;
+							}
 						}
 						
-						// Set safe text content
+						// Set display text
 						linkElement.textContent = `${domain}/[${linkType}]`;
 						container.appendChild(linkElement);
 						
 					} catch (e) {
-						// If URL parsing fails, treat as plain text
+						// If URL parsing fails, show as plain text
 						const textNode = document.createTextNode(part);
 						container.appendChild(textNode);
 					}
 				} else {
-					// NEW: More restrictive nostr identifier regex
-					const nostrRegex = /(nevent1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{10,}|note1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{10,}|npub1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{58}|nprofile1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{10,})/g;
+					// Handle nostr identifiers
+					const nostrRegex = /(npub1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{58}|note1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{58}|nevent1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{10,}|nprofile1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{10,})/g;
 					const nostrParts = part.split(nostrRegex);
 					
 					for (let j = 0; j < nostrParts.length; j++) {
 						const nostrPart = nostrParts[j];
 						
 						if (nostrPart.match(nostrRegex)) {
-							// NEW: Additional validation for nostr identifiers
 							if (nostrPart.length > 200) {
 								const textNode = document.createTextNode('[nostr ID too long]');
 								container.appendChild(textNode);
 								continue;
 							}
 							
-							// Create safe nostr link
 							const nostrLink = document.createElement('a');
 							nostrLink.href = `https://njump.me/${nostrPart}`;
 							nostrLink.target = '_blank';
@@ -2326,18 +2498,16 @@
 							nostrLink.style.textDecoration = 'underline';
 							nostrLink.textContent = nostrPart.substring(0, nostrPart.indexOf('1') + 2) + '...';
 							
-							// Add non-breaking space before
 							container.appendChild(document.createTextNode('\u00A0'));
 							container.appendChild(nostrLink);
 						} else {
-							// Regular text - shorten long strings
-							let processedText = nostrPart.replace(/\b[a-zA-Z0-9]{20,}\b/g, function(longString) {
-								// Skip if it's already a known nostr identifier
+							// Regular text - shorten very long strings
+							let processedText = nostrPart.replace(/\b[a-zA-Z0-9]{25,}\b/g, function(longString) {
 								if (longString.startsWith('npub1') || longString.startsWith('note1') || 
 									longString.startsWith('nevent1') || longString.startsWith('nprofile1')) {
 									return longString;
 								}
-								return longString.slice(0, 12) + '...';
+								return longString.slice(0, 15) + '...';
 							});
 							
 							const textNode = document.createTextNode(processedText);
@@ -2360,9 +2530,13 @@
 					currentType === 'npub' && 
 					currentValue === 'npub1v89nr2zax8ef0ceyu9te0sjyqv3newa3e82m0rd4kye3ekeyhv2sqf30cc';
 
-				// Clear all children
-				while (container.firstChild) {
-					container.removeChild(container.firstChild);
+				// Fast clear with fallback for older browsers
+				if (container.replaceChildren) {
+					container.replaceChildren();
+				} else {
+					while (container.firstChild) {
+						container.removeChild(container.firstChild);
+					}
 				}
 
 				// Put demo alert back if we should preserve it
@@ -2387,16 +2561,20 @@
 				currentType === 'npub' && 
 				currentValue === 'npub1v89nr2zax8ef0ceyu9te0sjyqv3newa3e82m0rd4kye3ekeyhv2sqf30cc';
 
-			// Clear all children
-			while (container.firstChild) {
-				container.removeChild(container.firstChild);
+			// Fast clear with fallback for older browsers
+			if (container.replaceChildren) {
+				container.replaceChildren();
+			} else {
+				while (container.firstChild) {
+					container.removeChild(container.firstChild);
+				}
 			}
 
 			// Put demo alert back if we should preserve it
 			if (shouldPreserveDemoAlert) {
 				container.appendChild(existingDemoAlert);
 			}
-			
+
 			const errorDiv = document.createElement('div');
 			errorDiv.className = 'error';
 			errorDiv.textContent = message;
@@ -2474,6 +2652,6 @@
 				logToConsole("No notes to re-sort");
 			}
 		});
-    </script>
+	</script>
 </body>
 </html>
