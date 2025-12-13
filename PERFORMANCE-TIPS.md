@@ -58,10 +58,11 @@ Just click "Just Go!" and enjoy. Everything works automatically.
 | Feature | Normal Mode | Slow Connection Mode |
 |---------|-------------|---------------------|
 | Notes displayed | 100-200 | 30-50 |
-| Profile pictures | ✅ Yes | ❌ No |
+| Profile pictures | ✅ Yes (200KB max) | ❌ No |
 | Usernames resolved | ✅ Yes | ❌ No (shows pubkey) |
 | Images in notes | ✅ Up to 300KB | ✅ Up to 100KB |
 | Follows checked | 200 | 50 |
+| Relay request limit | 1,000 notes | 200 notes |
 | Console debugger | 📊 Visible | 🔇 Hidden |
 | Memory usage | ~50-80MB | ~30-50MB |
 | Bandwidth usage | Normal | ~60% less |
@@ -125,7 +126,7 @@ Signs you need to clear memory:
   - More personalized
   - Slightly more bandwidth
   - Best for: Finding interesting people
-  
+
 - **Relay feeds**: Shows all recent notes from a relay
   - Less personalized
   - More bandwidth intensive
@@ -165,7 +166,7 @@ If you're still having issues:
 ## Remember
 
 - **Slow connection mode** is your friend on weak devices
-- **Clear Memory** button fixes most memory issues  
+- **Clear Memory** button fixes most memory issues
 - **Fewer notes** = better performance
 - **No images** = much faster loading
 

@@ -216,7 +216,7 @@
 		 *
 		 * This client is optimized for low-memory devices and slow connections:
 		 *
-		 * MEMORY OPTIMIZATIONS:
+		 * MEMORY OPTIMIZATIONS (ALWAYS ACTIVE):
 		 * - Console entries limited to 500 (from 2500)
 		 * - Feed size capped at 200 notes (from 500)
 		 * - Notes collection limited to 400 max (2x display limit)
@@ -224,14 +224,13 @@
 		 * - WebSocket connections tracked and cleaned up
 		 * - Memory cleanup function available in settings
 		 *
-		 * SLOW CONNECTION OPTIMIZATIONS:
+		 * SLOW CONNECTION MODE OPTIMIZATIONS (OPTIONAL):
 		 * - Reduced initial request limits (50 vs 100 notes)
 		 * - Fewer follows checked (50 vs 200)
 		 * - Smaller image size limits (100KB vs 300KB)
-		 * - Profile avatars disabled in slow mode
+		 * - Profile avatars disabled (50KB limit otherwise)
 		 * - Slower image processing (1 at a time vs 2)
 		 * - Relay request limits reduced (200 vs 1000)
-		 * - Avatar size limit: 50KB max
 		 *
 		 * Enable "Slow connection" mode for best performance on weak devices.
 		 */
@@ -2481,8 +2480,10 @@
 			.then(response => {
 				const contentLength = response.headers.get('content-length');
 
-				// Stricter size limit for avatars (50KB max)
-				if (contentLength && parseInt(contentLength) > 50000) {
+				// Size limit depends on connection mode
+				const maxAvatarSize = document.getElementById('slowConnection').checked ? 50000 : 200000;  // 50KB vs 200KB
+
+				if (contentLength && parseInt(contentLength) > maxAvatarSize) {
 					logToConsole(`Avatar too large: ${Math.round(contentLength/1000)}kb`, 'warn');
 					return;
 				}

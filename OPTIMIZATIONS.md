@@ -47,6 +47,7 @@ When "Slow connection" mode is enabled:
 | Follows checked | 200 | 50 |
 | Relay request limit | 1,000 | 200 |
 | Max image size | 300KB | 100KB |
+| Max avatar size | 200KB | 50KB |
 | Image batch size | 2 | 1 |
 | Batch delay | 200ms | 500ms |
 
@@ -126,12 +127,17 @@ tryConnectToSingleRelay()
 - Feed size: 500+ notes
 - WebSockets: Multiple unclosed connections
 - Memory: ~100-200MB for typical session
+- Image size limit: None
+- Avatar size limit: 300KB
 
 ### After Optimizations (Normal Mode)
 - Console entries: ≤500
 - Feed size: ≤200 notes
 - WebSockets: Properly tracked and closed
 - Memory: ~50-80MB for typical session
+- Image size limit: 300KB
+- Avatar size limit: 200KB
+- Full feature set enabled
 
 ### After Optimizations (Slow Mode)
 - Console entries: ≤500
@@ -139,6 +145,9 @@ tryConnectToSingleRelay()
 - WebSockets: Properly tracked and closed
 - Memory: ~30-50MB for typical session
 - Bandwidth: ~60% reduction
+- Image size limit: 100KB
+- Avatar size limit: 50KB
+- Avatars and usernames disabled
 
 ## Browser Compatibility
 
