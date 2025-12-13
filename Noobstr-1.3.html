@@ -78,21 +78,21 @@
 				<button class="icon-btn" onclick="toggleTheme()" id="themeBtn">🌙</button>
 			</div>
 		</div>
-		
+
 		<div class="input-group">
 			<input type="text" id="npubInput" placeholder="Enter npub or relay URL...">
 			<select id="savedSelector">
 				<option value="">Select saved...</option>
 			</select>
 		</div>
-		
+
 		<div id="settingsModal" class="modal">
 			<div class="modal-content">
 				<span class="close" onclick="closeSettings()">&times;</span>
 				<h3>Settings</h3>
-				
+
 				<p style="margin-bottom: 20px; color: #6b7280; font-size: 14px; line-height: 1.4;">Save frequently-used npubs and relay URLs here. Once saved, they'll appear in the "Select saved..." dropdown for one-click access. All data is stored locally on your device.</p>
-				
+
 				<div class="settings-section">
 					<h4>Saved Npubs</h4>
 					<div id="npubsList"></div>
@@ -114,6 +114,16 @@
 				</div>
 
 				<div class="settings-section">
+					<h4>Performance & Memory</h4>
+					<p style="font-size: 13px; color: #6b7280; margin-bottom: 8px;">
+						If the app feels slow or uses too much memory, click below to clear old data.
+					</p>
+					<button onclick="clearMemory()" style="background-color: #10b981; color: white; padding: 8px 16px;">
+						🧹 Clear Memory
+					</button>
+				</div>
+
+				<div class="settings-section">
 					<h4>Need Help Finding Npubs & Relays?</h4>
 					<p style="font-size: 13px; color: #6b7280; margin-bottom: 12px; line-height: 1.4;">
 						<strong>Npubs:</strong> Find NOSTRiches with good follow lists at <a href="https://nostr.directory" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange);">nostr.directory</a> <br>
@@ -131,7 +141,7 @@
 			<div class="modal-content">
 				<span class="close" onclick="closeHelpModal()">&times;</span>
 				<h3>How to Use Noobstr</h3>
-				
+
 				<div class="settings-section">
 					<h4>Quick Start</h4>
 					<p><strong>Just Go!</strong> - Loads a demo feed to see how Nostr works</p>
@@ -151,11 +161,11 @@
 				</div>
 			</div>
 		</div>
-		
+
 		<div style="margin-bottom: 4px;">
 			<button onclick="loadFeed()" style="background-color: var(--accent-orange); color: white; font-weight: bold; width: 100%;">Just Go!</button>
 		</div>
-		
+
 		<div class="controls-row">
 			<select id="sortOrder">
 				<option value="newest">↓ Newest</option>
@@ -201,6 +211,31 @@
 	</div>
 
 	<script>
+		/**
+		 * NOOBSTR.ME - Memory & Bandwidth Optimizations
+		 *
+		 * This client is optimized for low-memory devices and slow connections:
+		 *
+		 * MEMORY OPTIMIZATIONS:
+		 * - Console entries limited to 500 (from 2500)
+		 * - Feed size capped at 200 notes (from 500)
+		 * - Notes collection limited to 400 max (2x display limit)
+		 * - Image queue limited to 50 items
+		 * - WebSocket connections tracked and cleaned up
+		 * - Memory cleanup function available in settings
+		 *
+		 * SLOW CONNECTION OPTIMIZATIONS:
+		 * - Reduced initial request limits (50 vs 100 notes)
+		 * - Fewer follows checked (50 vs 200)
+		 * - Smaller image size limits (100KB vs 300KB)
+		 * - Profile avatars disabled in slow mode
+		 * - Slower image processing (1 at a time vs 2)
+		 * - Relay request limits reduced (200 vs 1000)
+		 * - Avatar size limit: 50KB max
+		 *
+		 * Enable "Slow connection" mode for best performance on weak devices.
+		 */
+
         let currentFeed = [];
         let currentType = null;
         let currentValue = null;
@@ -210,8 +245,10 @@
 		let imageProcessingQueue = [];
 		let isProcessingImages = false;
 		let consoleEntries = [];
-		const MAX_CONSOLE_ENTRIES = 2500;
-		
+		const MAX_CONSOLE_ENTRIES = 500;  // Reduced from 2500
+		const MAX_FEED_SIZE = 200;  // Reduced from 500 for lower memory
+		let activeWebSockets = [];  // Track all WebSocket connections for cleanup
+
 		// Fallback relays for npub lookups (in order of preference)
 		const FALLBACK_RELAYS = [
 			'wss://relay.nostr.band',
@@ -220,50 +257,118 @@
 			'wss://coracle.social'
 		];
 
+		// Cleanup function to close all active WebSocket connections
+		function cleanupWebSockets() {
+			logToConsole(`Cleaning up ${activeWebSockets.length} WebSocket connections`);
+
+			activeWebSockets.forEach(ws => {
+				try {
+					if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+						ws.close();
+					}
+				} catch (e) {
+					// Ignore errors during cleanup
+				}
+			});
+
+			// Clear the array
+			activeWebSockets = [];
+		}
+
+		// Cleanup when page unloads
+		window.addEventListener('beforeunload', cleanupWebSockets);
+
+		// Memory cleanup function
+		function clearMemory() {
+			logToConsole('🧹 Clearing memory...', 'success');
+
+			// Clear console entries (keep only last 50)
+			if (consoleEntries.length > 50) {
+				consoleEntries = consoleEntries.slice(0, 50);
+			}
+
+			// Clear image queue
+			imageProcessingQueue = [];
+			isProcessingImages = false;
+
+			// Close any idle WebSocket connections
+			cleanupWebSockets();
+
+			// Remove images from DOM that are far out of view (memory saver)
+			unloadOffscreenImages();
+
+			showMessageBanner('Memory cleared! Old data removed.', 3000);
+		}
+
+		// Remove images that are far outside the viewport to save memory
+		function unloadOffscreenImages() {
+			const images = document.querySelectorAll('.note img');
+			let unloadedCount = 0;
+
+			images.forEach(img => {
+				const rect = img.getBoundingClientRect();
+				const viewportHeight = window.innerHeight;
+
+				// If image is more than 2 viewports away (above or below), remove it
+				if (rect.bottom < -viewportHeight * 2 || rect.top > viewportHeight * 3) {
+					img.remove();
+					unloadedCount++;
+				}
+			});
+
+			if (unloadedCount > 0) {
+				logToConsole(`Unloaded ${unloadedCount} offscreen images to save memory`);
+			}
+		}
+
+
+
 		function logToConsole(message, type = 'log') {
-			const sanitizedMessage = typeof message === 'string' ? 
-				message.substring(0, 1000).replace(/[<>&"']/g, '') : 
-				String(message).substring(0, 1000);
-			
+			// Truncate message earlier to save memory
+			const sanitizedMessage = typeof message === 'string' ?
+				message.substring(0, 200).replace(/[<>&"']/g, '') :
+				String(message).substring(0, 200);
+
 			if (console[type]) {
 				console[type](sanitizedMessage);
 			} else {
 				console.log(sanitizedMessage);
 			}
-			
+
 			const timestamp = new Date().toLocaleTimeString();
-			
+
 			// Add to beginning of array with sanitized message
 			consoleEntries.unshift({ message: sanitizedMessage, type, timestamp });
 
 			// Properly limit array size to prevent memory leak
 			if (consoleEntries.length > MAX_CONSOLE_ENTRIES) {
-				consoleEntries.length = MAX_CONSOLE_ENTRIES;
+				// Trim excess entries more aggressively
+				consoleEntries.splice(MAX_CONSOLE_ENTRIES);
 			}
-			
+
 			// Show the consolebanner and update latest message
 			const consoleBanner = document.getElementById('consoleBanner');
 			const latestMessage = document.getElementById('latestMessage');
-			
+
 			if (!consoleBanner.classList.contains('show')) {
 				consoleBanner.classList.add('show');
 			}
-			
+
 			// Truncate very long messages in the banner to prevent UI issues
 			const truncatedMessage = sanitizedMessage.length > 100 ? sanitizedMessage.slice(0, 100) + '...' : sanitizedMessage;
 			latestMessage.textContent = truncatedMessage;
-			
+
 			// Only update full log if it's currently expanded (performance improvement)
 			const consoleContent = document.getElementById('consoleContent');
 			if (consoleContent && consoleContent.classList.contains('expanded')) {
 				updateConsoleContent();
 			}
 		}
-		
+
 		function toggleConsoleLog() {
 			const consoleContent = document.getElementById('consoleContent');
 			const expandIcon = document.getElementById('expandIcon');
-			
+
 			if (consoleContent.classList.contains('expanded')) {
 				consoleContent.classList.remove('expanded');
 				expandIcon.textContent = '▼';
@@ -277,63 +382,63 @@
 		function updateConsoleContent() {
 			const consoleContent = document.getElementById('consoleContent');
 			if (!consoleContent.classList.contains('expanded')) return;
-			
+
 			// Clear existing content
 			while (consoleContent.firstChild) {
 				consoleContent.removeChild(consoleContent.firstChild);
 			}
-			
-			// Initial batch size - start small
-			const initialBatchSize = 50;
+
+			// Initial batch size - start small, even smaller on slow connections
+			const initialBatchSize = document.getElementById('slowConnection').checked ? 25 : 50;
 			let currentDisplayCount = 0;
-			
+
 			// Create container for entries
 			const entriesContainer = document.createElement('div');
 			consoleContent.appendChild(entriesContainer);
-			
+
 			// Function to load more entries
 			const loadMoreEntries = () => {
 				const fragment = document.createDocumentFragment();
 				const endIndex = Math.min(currentDisplayCount + initialBatchSize, consoleEntries.length);
-				
+
 				for (let i = currentDisplayCount; i < endIndex; i++) {
 					const entry = consoleEntries[i];
 					const div = document.createElement('div');
 					div.className = `console-entry ${entry.type || 'log'}`;
-					
+
 					const timeSpan = document.createElement('span');
 					timeSpan.style.color = '#6b7280';
 					timeSpan.textContent = `[${entry.timestamp}] `;
-					
+
 					const messageSpan = document.createElement('span');
 					const truncatedMessage = entry.message.length > 200 ? entry.message.slice(0, 200) + '...' : entry.message;
 					messageSpan.textContent = truncatedMessage;
-					
+
 					div.appendChild(timeSpan);
 					div.appendChild(messageSpan);
 					fragment.appendChild(div);
 				}
-				
+
 				entriesContainer.appendChild(fragment);
 				currentDisplayCount = endIndex;
-				
+
 				// Remove load more button if we've shown everything
 				const loadMoreBtn = consoleContent.querySelector('.load-more-btn');
 				if (loadMoreBtn && currentDisplayCount >= consoleEntries.length) {
 					loadMoreBtn.remove();
 				}
 			};
-			
+
 			// Load initial batch
 			loadMoreEntries();
-			
+
 			// Add "Load More" button if there are more entries
 			if (currentDisplayCount < consoleEntries.length) {
 				const loadMoreBtn = document.createElement('button');
 				loadMoreBtn.className = 'load-more-btn';
 				loadMoreBtn.textContent = `Load ${Math.min(initialBatchSize, consoleEntries.length - currentDisplayCount)} more entries (${consoleEntries.length - currentDisplayCount} remaining)`;
 				loadMoreBtn.style.cssText = 'width: 100%; padding: 8px; margin: 4px 0; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; font-size: 12px;';
-				
+
 				loadMoreBtn.addEventListener('click', () => {
 					loadMoreEntries();
 					// Update button text
@@ -341,7 +446,7 @@
 						loadMoreBtn.textContent = `Load ${Math.min(initialBatchSize, consoleEntries.length - currentDisplayCount)} more entries (${consoleEntries.length - currentDisplayCount} remaining)`;
 					}
 				});
-				
+
 				consoleContent.appendChild(loadMoreBtn);
 			}
 		}
@@ -351,12 +456,12 @@
 			const npubInput = document.getElementById('npubInput');
 			const savedSelector = document.getElementById('savedSelector');
 			const slowConnection = document.getElementById('slowConnection');
-			
+
 			if (!npubInput || !savedSelector || !slowConnection) {
 				console.error('Required DOM elements not found');
 				return;
 			}
-			
+
 			loadSettings();
 			updateSavedSelector();
 			logToConsole('Noobstr initialized! 🤙');
@@ -367,32 +472,32 @@
 			try {
 				// Convert WebSocket URL to HTTP for NIP-11 request
 				const httpUrl = relayUrl.replace('wss://', 'https://').replace('ws://', 'http://');
-				
+
 				logToConsole(`📡 Checking relay info: ${httpUrl}`);
-				
+
 				// Set up timeout
 				const controller = new AbortController();
 				const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
-				
+
 				const response = await fetch(httpUrl, {
-					headers: { 
+					headers: {
 						'Accept': 'application/nostr+json',
 						'User-Agent': 'Noobstr/1.1'
 					},
 					signal: controller.signal
 				});
-				
+
 				clearTimeout(timeoutId);
-				
+
 				if (!response.ok) {
 					logToConsole(`⚠️ Relay ${relayUrl} - no info document (${response.status})`, 'warn');
 					return null;
 				}
-				
+
 				const info = await response.json();
 				logToConsole(`✅ Got relay info for ${relayUrl}`, 'success');
 				return info;
-				
+
 			} catch (error) {
 				if (error.name === 'AbortError') {
 					logToConsole(`⏰ Relay info timeout for ${relayUrl}`, 'warn');
@@ -409,7 +514,7 @@
 				logToConsole("❌ Invalid event: not an object", 'error');
 				return false;
 			}
-			
+
 			// Check required fields exist
 			const requiredFields = ['id', 'pubkey', 'created_at', 'kind', 'tags', 'content', 'sig'];
 			for (const field of requiredFields) {
@@ -418,72 +523,72 @@
 					return false;
 				}
 			}
-			
+
 			// Basic format checks
 			if (typeof event.id !== 'string' || event.id.length !== 64) {
 				logToConsole("❌ Invalid event: id should be 64 character hex string", 'error');
 				return false;
 			}
-			
+
 			if (typeof event.pubkey !== 'string' || event.pubkey.length !== 64) {
 				logToConsole("❌ Invalid event: pubkey should be 64 character hex string", 'error');
 				return false;
 			}
-			
+
 			if (!Number.isInteger(event.created_at) || event.created_at <= 0) {
 				logToConsole("❌ Invalid event: created_at should be positive integer", 'error');
 				return false;
 			}
-			
+
 			if (!Number.isInteger(event.kind) || event.kind < 0 || event.kind > 65535) {
 				logToConsole("❌ Invalid event: kind should be integer 0-65535", 'error');
 				return false;
 			}
-			
+
 			if (!Array.isArray(event.tags)) {
 				logToConsole("❌ Invalid event: tags should be an array", 'error');
 				return false;
 			}
-			
+
 			// Reject overly long content to prevent memory issues
 			if (event.content.length > 50000) {
 				logToConsole("⛔ Invalid event: content too long (" + event.content.length + " chars)", 'error');
 				return false;
 			}
-			
+
 			if (typeof event.content !== 'string') {
 				logToConsole("❌ Invalid event: content should be string", 'error');
 				return false;
 			}
-			
+
 			if (typeof event.sig !== 'string' || event.sig.length !== 128) {
 				logToConsole("❌ Invalid event: sig should be 128 character hex string", 'error');
 				return false;
 			}
-			
+
 			// Check hex format for id, pubkey, and sig
 			const hexRegex = /^[a-f0-9]+$/i;
 			if (!hexRegex.test(event.id)) {
 				logToConsole("❌ Invalid event: id contains non-hex characters", 'error');
 				return false;
 			}
-			
+
 			if (!hexRegex.test(event.pubkey)) {
 				logToConsole("❌ Invalid event: pubkey contains non-hex characters", 'error');
 				return false;
 			}
-			
+
 			if (!hexRegex.test(event.sig)) {
 				logToConsole("❌ Invalid event: sig contains non-hex characters", 'error');
 				return false;
 			}
-			
+
 			// NEW: Check for unsafe URLs in content
 			if (containsUnsafeUrls(event.content)) {
 				logToConsole("❌ Invalid event: contains unsafe or malformed URLs", 'error');
 				return false;
 			}
-			
+
 			logToConsole("✅ Event format validation passed", 'success');
 			return true;
 		}
@@ -495,10 +600,10 @@
 
 			// Bech32 alphabet - these are the allowed characters
 			const alphabet = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
-			
+
 			try {
 				const data = npub.slice(4);
-				
+
 				// Convert each character to its number value
 				const decoded = [];
 				for (let i = 0; i < data.length; i++) {
@@ -509,17 +614,17 @@
 					}
 					decoded.push(value);
 				}
-				
+
 				// Skip checksum (last 6 characters) and convert from 5-bit to 8-bit
 				const payload = decoded.slice(1, -6);
 				const pubkeyBytes = convertBits(payload, 5, 8, false);
-				
+
 				// Convert to hex string
 				const pubkey = pubkeyBytes.map(b => b.toString(16).padStart(2, '0')).join('');
-				
+
 				logToConsole("🔑 Decoded npub to pubkey: " + pubkey);
 				return pubkey;
-				
+
 			} catch (error) {
 				throw new Error('Invalid npub format: ' + error.message);
 			}
@@ -531,29 +636,29 @@
 			let bits = 0;
 			const ret = [];
 			const maxv = (1 << toBits) - 1;
-			
+
 			for (let i = 0; i < data.length; i++) {
 				const value = data[i];
 				acc = (acc << fromBits) | value;
 				bits += fromBits;
-				
+
 				while (bits >= toBits) {
 					bits -= toBits;
 					ret.push((acc >> bits) & maxv);
 				}
 			}
-			
+
 			if (pad && bits > 0) {
 				ret.push((acc << (toBits - bits)) & maxv);
 			}
-			
+
 			return ret;
 		}
 
 		function toggleTheme() {
 			const body = document.body;
 			const currentTheme = body.getAttribute('data-theme') || 'light';
-			
+
 			let newTheme;
 			if (currentTheme === 'light') {
 				newTheme = 'dark';
@@ -562,7 +667,7 @@
 			} else {
 				newTheme = 'light';
 			}
-			
+
 			body.setAttribute('data-theme', newTheme);
 			localStorage.setItem('theme', newTheme);
 		}
@@ -589,11 +694,11 @@
 			try {
 				const savedNpubs = JSON.parse(localStorage.getItem('savedNpubs') || '[]');
 				if (Array.isArray(savedNpubs)) {
-					npubs = savedNpubs.filter(item => 
-						item && 
+					npubs = savedNpubs.filter(item =>
+						item &&
 						typeof item === 'object' &&  // NEW: Ensure item is an object
-						typeof item.name === 'string' && 
-						typeof item.value === 'string' && 
+						typeof item.name === 'string' &&
+						typeof item.value === 'string' &&
 						item.value.startsWith('npub1') &&
 						item.name.length < 100 &&  // NEW: Limit name length
 						item.value.length === 63    // NEW: Validate npub length
@@ -603,17 +708,17 @@
 				console.log('Invalid npubs data in localStorage, clearing');
 				localStorage.removeItem('savedNpubs');
 			}
-			
-			// Validate relays from localStorage  
+
+			// Validate relays from localStorage
 			let relays = [];
 			try {
 				const savedRelays = JSON.parse(localStorage.getItem('savedRelays') || '[]');
 				if (Array.isArray(savedRelays)) {
-					relays = savedRelays.filter(item => 
-						item && 
+					relays = savedRelays.filter(item =>
+						item &&
 						typeof item === 'object' &&  // NEW: Ensure item is an object
-						typeof item.name === 'string' && 
-						typeof item.value === 'string' && 
+						typeof item.name === 'string' &&
+						typeof item.value === 'string' &&
 						(item.value.startsWith('wss://') || item.value.startsWith('ws://')) &&
 						item.name.length < 100 &&  // NEW: Limit name length
 						item.value.length < 500     // NEW: Limit URL length
@@ -623,7 +728,7 @@
 				console.log('Invalid relays data in localStorage, clearing');
 				localStorage.removeItem('savedRelays');
 			}
-			
+
 			updateSettingsDisplay();
 		}
 
@@ -635,7 +740,7 @@
 			const selector = document.getElementById('savedSelector');
 			const npubs = JSON.parse(localStorage.getItem('savedNpubs') || '[]');
 			const relays = JSON.parse(localStorage.getItem('savedRelays') || '[]');
-			
+
 			// Clear selector
 			while (selector.firstChild) {
 				selector.removeChild(selector.firstChild);
@@ -646,40 +751,40 @@
 			defaultOption.value = '';
 			defaultOption.textContent = 'Select saved...';
 			selector.appendChild(defaultOption);
-			
+
 			// Add demo option
 			const demoOption = document.createElement('option');
 			demoOption.value = 'npub1v89nr2zax8ef0ceyu9te0sjyqv3newa3e82m0rd4kye3ekeyhv2sqf30cc';
 			demoOption.textContent = '🤙 Demo (Default)';
 			selector.appendChild(demoOption);
-			
+
 			// Add npub section if there are any saved npubs
 			if (npubs.length > 0) {
 				const npubGroup = document.createElement('optgroup');
 				npubGroup.label = 'Saved Npubs';
-				
+
 				npubs.forEach(item => {
 					const option = document.createElement('option');
 					option.value = item.value;
 					option.textContent = `👤 ${item.name}`;
 					npubGroup.appendChild(option);
 				});
-				
+
 				selector.appendChild(npubGroup);
 			}
-			
-			// Add relay section if there are any saved relays  
+
+			// Add relay section if there are any saved relays
 			if (relays.length > 0) {
 				const relayGroup = document.createElement('optgroup');
 				relayGroup.label = 'Saved Relays';
-				
+
 				relays.forEach(item => {
 					const option = document.createElement('option');
 					option.value = item.value;
 					option.textContent = `⚡ ${item.name}`;
 					relayGroup.appendChild(option);
 				});
-				
+
 				selector.appendChild(relayGroup);
 			}
 		}
@@ -689,7 +794,7 @@
 			const relays = JSON.parse(localStorage.getItem('savedRelays') || '[]');
 			const npubsList = document.getElementById('npubsList');
 			const relaysList = document.getElementById('relaysList');
-			
+
 			// Clear existing content using DOM methods
 			while (npubsList.firstChild) {
 				npubsList.removeChild(npubsList.firstChild);
@@ -697,51 +802,51 @@
 			while (relaysList.firstChild) {
 				relaysList.removeChild(relaysList.firstChild);
 			}
-			
+
 			// Build npubs list safely
 			npubs.forEach((item, index) => {
 				const div = document.createElement('div');
 				div.className = 'settings-item';
-				
+
 				const nameInput = document.createElement('input');
 				nameInput.type = 'text';
 				nameInput.value = item.name;
 				nameInput.readOnly = true;
-				
+
 				const valueInput = document.createElement('input');
 				valueInput.type = 'text';
 				valueInput.value = item.value;
 				valueInput.readOnly = true;
-				
+
 				const removeBtn = document.createElement('button');
 				removeBtn.textContent = 'Remove Npub';
 				removeBtn.onclick = () => removeNpub(index);
-				
+
 				div.appendChild(nameInput);
 				div.appendChild(valueInput);
 				div.appendChild(removeBtn);
 				npubsList.appendChild(div);
 			});
-			
+
 			// Build relays list safely
 			relays.forEach((item, index) => {
 				const div = document.createElement('div');
 				div.className = 'settings-item';
-				
+
 				const nameInput = document.createElement('input');
 				nameInput.type = 'text';
 				nameInput.value = item.name;
 				nameInput.readOnly = true;
-				
+
 				const valueInput = document.createElement('input');
 				valueInput.type = 'text';
 				valueInput.value = item.value;
 				valueInput.readOnly = true;
-				
+
 				const removeBtn = document.createElement('button');
 				removeBtn.textContent = 'Remove Relay';
 				removeBtn.onclick = () => removeRelay(index);
-				
+
 				div.appendChild(nameInput);
 				div.appendChild(valueInput);
 				div.appendChild(removeBtn);
@@ -752,16 +857,16 @@
 		function showMessageBanner(message, duration = 3000) {
 			const banner = document.getElementById('messageBanner');
 			const bannerText = document.getElementById('bannerText');
-			
+
 			// Clear any existing timeout
 			if (bannerTimeout) {
 				clearTimeout(bannerTimeout);
 			}
-			
+
 			// Set the message and show banner
 			bannerText.textContent = message;
 			banner.classList.add('show');
-			
+
 			// Auto-hide after duration
 			bannerTimeout = setTimeout(() => {
 				hideBanner();
@@ -782,54 +887,64 @@
 			if (document.getElementById('slowConnection').checked) {
 				return content;
 			}
-			
+
 			// Check if this noteElement already has images processed
 			if (noteElement.dataset.imagesProcessed === 'true') {
 				return content;
 			}
-			
+
 			// Look for image URLs in the content
 			const imageUrlRegex = /(https:\/\/[^.\s]*\.nostr\.build\/[^\s]+\.(jpg|jpeg|png|gif|webp))/gi;
 			const imageUrls = content.match(imageUrlRegex);
-			
+
 			if (imageUrls) {
 				// Mark this note as having images processed
 				noteElement.dataset.imagesProcessed = 'true';
-				
+
 				// Add to queue
 				imageUrls.forEach(url => {
 					imageProcessingQueue.push({ url, noteElement });
 					logToConsole(`Added image to queue: ${url.slice(-20)}...`);
 				});
-				
+
 				// Start processing if not already running
 				if (!isProcessingImages) {
 					processImageQueue();
 				}
 			}
-			
+
 			return content;
 		}
-		
+
 		async function processImageQueue() {
 			isProcessingImages = true;
-			
+
+			// Limit queue size to prevent memory issues
+			const maxQueueSize = 50;
+			if (imageProcessingQueue.length > maxQueueSize) {
+				logToConsole(`Image queue limited to ${maxQueueSize} items`, 'warn');
+				imageProcessingQueue = imageProcessingQueue.slice(0, maxQueueSize);
+			}
+
 			while (imageProcessingQueue.length > 0) {
 				const batch = [];
-				
-				// Process up to 3 images at once
-				for (let i = 0; i < 3 && imageProcessingQueue.length > 0; i++) {
+
+				// Process only 2 images at once on slow connections, 3 otherwise
+				const batchSize = document.getElementById('slowConnection').checked ? 1 : 2;
+
+				for (let i = 0; i < batchSize && imageProcessingQueue.length > 0; i++) {
 					const item = imageProcessingQueue.shift();
 					batch.push(checkAndRenderImage(item.url, item.noteElement));
 				}
-				
+
 				// Process this batch
 				await Promise.allSettled(batch);
-				
-				// Small delay to prevent browser lockup on weak devices
-				await new Promise(resolve => setTimeout(resolve, 200));
+
+				// Longer delay on slow connections to reduce bandwidth usage
+				const delay = document.getElementById('slowConnection').checked ? 500 : 200;
+				await new Promise(resolve => setTimeout(resolve, delay));
 			}
-			
+
 			isProcessingImages = false;
 		}
 
@@ -842,7 +957,7 @@
 						logToConsole(`Blocked non-HTTP protocol: ${validUrl.protocol}`, 'warn');
 						return;
 					}
-					
+
 					// Only allow nostr.build domain
 					if (!validUrl.hostname.endsWith('nostr.build')) {
 						logToConsole(`Blocked non-nostr.build domain: ${validUrl.hostname}`, 'warn');
@@ -852,23 +967,26 @@
 					logToConsole(`Malformed image URL blocked`, 'warn');
 					return;
 				}
-				
+
 				logToConsole(`Checking nostr.build image: ${imageUrl.slice(-20)}...`);
-				
+
 				// Head request to check file size with timeout
 				const controller = new AbortController();
 				const timeoutId = setTimeout(() => controller.abort(), 3000);
-				
+
 				try {
-					const response = await fetch(imageUrl, { 
-						method: 'HEAD', 
-						signal: controller.signal 
+					const response = await fetch(imageUrl, {
+						method: 'HEAD',
+						signal: controller.signal
 					});
 					clearTimeout(timeoutId);
-					
+
 					const contentLength = response.headers.get('content-length');
-					
-					if (contentLength && parseInt(contentLength) > 300000) {
+
+					// More aggressive size limit on slow connections
+					const maxSize = document.getElementById('slowConnection').checked ? 100000 : 300000;  // 100KB vs 300KB
+
+					if (contentLength && parseInt(contentLength) > maxSize) {
 						logToConsole(`Image too large: ${Math.round(contentLength/1000)}kb`, 'warn');
 						return;
 					}
@@ -877,42 +995,42 @@
 					logToConsole(`Failed to check image size: ${fetchError.message}`, 'warn');
 					return;
 				}
-				
+
 				// Create image element with timeout and error handling
 				const img = document.createElement('img');
 				img.style.cssText = `
-					max-width: 300px; 
-					max-height: 200px; 
-					margin: 8px 0; 
-					border-radius: 4px; 
+					max-width: 300px;
+					max-height: 200px;
+					margin: 8px 0;
+					border-radius: 4px;
 					cursor: pointer;
 					display: block;
 				`;
-				
+
 				// Set up timeout to cancel slow loading images
 				const loadTimeout = setTimeout(() => {
 					img.src = ''; // Cancel loading
 					img.remove(); // Remove from DOM
 					logToConsole(`Image load timeout: ${imageUrl.slice(-20)}...`, 'warn');
 				}, 5000); // 5 second timeout for actual image loading
-				
+
 				img.onload = () => {
 					clearTimeout(loadTimeout);
 					logToConsole(`Image rendered: ${imageUrl.slice(-20)}.`, 'success');
 				};
-				
+
 				img.onerror = () => {
 					clearTimeout(loadTimeout);
 					img.remove(); // Remove broken image from DOM
 					logToConsole(`Image not loaded: ${imageUrl.slice(-20)}...`, 'error');
 				};
-				
+
 				img.onclick = () => openLightbox(imageUrl);
-				
+
 				// Start loading after setting up handlers
 				img.src = imageUrl;
 				noteElement.appendChild(img);
-				
+
 			} catch (error) {
 				logToConsole(`Failed to check image: ${error.message}`, 'error');
 			}
@@ -928,40 +1046,40 @@
 			} catch (e) {
 				return; // Skip malformed URLs
 			}
-			
+
 			const lightbox = document.createElement('div');
 			lightbox.className = 'lightbox';
-			
+
 			const img = document.createElement('img');
 			img.src = imageUrl;
 			img.onclick = (e) => e.stopPropagation(); // Prevent closing when clicking image
-			
+
 			const closeBtn = document.createElement('span');
 			closeBtn.className = 'lightbox-close';
 			closeBtn.innerHTML = '&times;';
-			
+
 			// Create the escape handler function
 			const escapeHandler = (e) => {
 				if (e.key === 'Escape') {
 					closeLightbox(lightbox, escapeHandler);
 				}
 			};
-			
+
 			// Create a unified close function that always cleans up properly
 			const closeLightboxSafely = () => {
 				closeLightbox(lightbox, escapeHandler);
 			};
-			
+
 			// Assign the same cleanup function to all close triggers
 			closeBtn.onclick = closeLightboxSafely;
 			lightbox.onclick = closeLightboxSafely;
-			
+
 			lightbox.appendChild(img);
 			lightbox.appendChild(closeBtn);
-			
+
 			document.body.appendChild(lightbox);
 			lightbox.style.display = 'block';
-			
+
 			// Add escape key listener
 			document.addEventListener('keydown', escapeHandler);
 		}
@@ -971,7 +1089,7 @@
 			if (escapeHandler) {
 				document.removeEventListener('keydown', escapeHandler);
 			}
-			
+
 			lightbox.style.display = 'none';
 			document.body.removeChild(lightbox);
 		}
@@ -979,56 +1097,56 @@
 		function containsUnsafeUrls(content) {
 			// Define allowed protocols - only very common, safe ones
 			const SAFE_PROTOCOLS = new Set([
-				'http:', 'https:', 'ws:', 'wss:', 
+				'http:', 'https:', 'ws:', 'wss:',
 				'ftp:', 'ftps:', 'mailto:', 'tel:', 'sms:',
 				'nostr:'  // Add nostr protocol as safe
 			]);
-			
+
 			// More comprehensive URL regex
 			const urlRegex = /(https?:\/\/[^\s<>"\[\]{}|\\^`]+)|([a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^\s<>"\[\]{}|\\^`]+)|([a-zA-Z][a-zA-Z0-9+.-]*:[^\s<>"\[\]{}|\\^`\s]+)/gi;
-			
+
 			const urls = content.match(urlRegex);
-			
+
 			if (!urls) {
 				return false; // No URLs found, content is safe
 			}
-			
+
 			logToConsole(`Checking ${urls.length} URLs in note for safety`);
-			
+
 			for (const urlString of urls) {
 				try {
 					// Handle special cases that don't need URL constructor
-					if (urlString.startsWith('mailto:') || 
-						urlString.startsWith('tel:') || 
+					if (urlString.startsWith('mailto:') ||
+						urlString.startsWith('tel:') ||
 						urlString.startsWith('sms:') ||
 						urlString.startsWith('nostr:')) {
 						continue; // These are safe
 					}
-					
+
 					const url = new URL(urlString);
-					
+
 					if (!SAFE_PROTOCOLS.has(url.protocol)) {
 						logToConsole(`Unsafe protocol detected: ${url.protocol} in URL: ${urlString.slice(0, 50)}...`, 'warn');
 						return true; // Found unsafe URL
 					}
-					
+
 					// Additional safety checks for dangerous protocols
-					if (url.protocol === 'javascript:' || 
-						url.protocol === 'data:' || 
-						url.protocol === 'file:' || 
+					if (url.protocol === 'javascript:' ||
+						url.protocol === 'data:' ||
+						url.protocol === 'file:' ||
 						url.protocol === 'blob:' ||
 						url.protocol === 'vbscript:') {
 						logToConsole(`Potentially malicious protocol blocked: ${url.protocol}`, 'warn');
 						return true;
 					}
-					
+
 				} catch (error) {
 					// If URL constructor fails, it's malformed
 					logToConsole(`Malformed URL detected: ${urlString.slice(0, 50)}...`, 'warn');
 					return true;
 				}
 			}
-			
+
 			logToConsole(`All URLs in note are safe`, 'success');
 			return false; // All URLs are safe
 		}
@@ -1036,23 +1154,23 @@
 		// Replace all URLs with pretty shortened versions based on content type
 		function prettifyAllLinks(text) {
 			const urlRegex = /(https?:\/\/[^\s]+)/gi;
-			
+
 			return text.replace(urlRegex, function(fullUrl) {
 				try {
 					const urlObj = new URL(fullUrl);
-					
+
 					// SECURITY: Only allow safe protocols
 					if (urlObj.protocol !== 'https:' && urlObj.protocol !== 'http:') {
 						logToConsole(`Blocked unsafe URL protocol: ${urlObj.protocol}`, 'warn');
 						return fullUrl; // Return as plain text, don't make it a link
 					}
-					
+
 					const domain = urlObj.hostname.replace(/^www\./, '');
 					const path = urlObj.pathname.toLowerCase();
 					const searchParams = urlObj.search.toLowerCase();
-					
+
 					let linkType = 'web'; // default
-					
+
 					// Video platforms
 					if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
 						linkType = 'video';
@@ -1061,21 +1179,21 @@
 					} else if (domain.includes('tiktok.com') || domain.includes('instagram.com') && path.includes('/reel')) {
 						linkType = 'video';
 					}
-					
+
 					// Music platforms
 					else if (domain.includes('spotify.com') || domain.includes('tidal.com') || domain.includes('apple.com') && path.includes('music')) {
 						linkType = 'music';
 					} else if (domain.includes('soundcloud.com') || domain.includes('bandcamp.com')) {
 						linkType = 'music';
 					}
-					
+
 					// Social media
 					else if (domain.includes('twitter.com') || domain.includes('x.com')) {
 						linkType = 'social';
 					} else if (domain.includes('facebook.com') || domain.includes('instagram.com') || domain.includes('linkedin.com')) {
 						linkType = 'social';
 					}
-					
+
 					// Media files (keep your existing logic)
 					else if (fullUrl.match(/\.(mp4|mov|avi|mkv|webm)$/i)) {
 						linkType = 'video';
@@ -1086,15 +1204,15 @@
 					} else if (fullUrl.match(/\.(mp3|wav|flac|m4a)$/i)) {
 						linkType = 'audio';
 					}
-					
+
 					// News/articles
 					else if (domain.includes('reddit.com') || domain.includes('news.') || domain.includes('cnn.com') || domain.includes('bbc.')) {
 						linkType = 'news';
 					}
-					
+
 					const safeUrl = fullUrl.replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 					return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-orange); text-decoration: underline;">${domain}/[${linkType}]</a>`;
-					
+
 				} catch (e) {
 					return fullUrl; // Return original if URL parsing fails
 				}
@@ -1104,7 +1222,7 @@
 		function addNpub() {
 			const name = document.getElementById('newNpubName').value.trim();
 			const value = document.getElementById('newNpubValue').value.trim();
-			
+
 			if (!name && !value) {
 				showMessageBanner("Please enter both a name and npub", 3000);
 				return;
@@ -1117,43 +1235,43 @@
 				showMessageBanner("Please enter an npub value", 3000);
 				return;
 			}
-			
+
 			// NEW: Validate npub format
 			if (!value.startsWith('npub1') || value.length !== 63) {
 				showMessageBanner("Invalid npub format. Must start with 'npub1' and be 63 characters long.", 4000);
 				return;
 			}
-			
+
 			// NEW: Check for valid bech32 characters only
 			const validChars = /^npub1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+$/;
 			if (!validChars.test(value)) {
 				showMessageBanner("Invalid npub: contains invalid characters", 3000);
 				return;
 			}
-			
+
 			// NEW: Sanitize the name to prevent XSS
 			const sanitizedName = name.replace(/[<>&"']/g, '').substring(0, 50);
 			if (sanitizedName !== name) {
 				showMessageBanner("Name was sanitized (removed special characters/length)", 3000);
 			}
-			
+
 			const npubs = JSON.parse(localStorage.getItem('savedNpubs') || '[]');
 			npubs.push({ name: sanitizedName, value });
 			localStorage.setItem('savedNpubs', JSON.stringify(npubs));
-			
+
 			document.getElementById('newNpubName').value = '';
 			document.getElementById('newNpubValue').value = '';
-			
+
 			updateSettingsDisplay();
 			updateSavedSelector();
-			
+
 			showMessageBanner(`Saved npub: ${sanitizedName}`, 2000);
 		}
 
 		function addRelay() {
 			const name = document.getElementById('newRelayName').value.trim();
 			const value = document.getElementById('newRelayValue').value.trim();
-			
+
 			if (!name && !value) {
 				showMessageBanner("Please enter both a name and relay URL", 3000);
 				return;
@@ -1166,58 +1284,58 @@
 				showMessageBanner("Please enter a relay URL", 3000);
 				return;
 			}
-			
+
 			// NEW: Validate relay URL format
 			if (!value.startsWith('wss://') && !value.startsWith('ws://')) {
 				showMessageBanner("Invalid relay URL. Must start with 'wss://' or 'ws://'", 3000);
 				return;
 			}
-			
+
 			// NEW: Validate URL structure using URL constructor
 			try {
 				const url = new URL(value);
-				
+
 				// Ensure protocol is WebSocket
 				if (url.protocol !== 'wss:' && url.protocol !== 'ws:') {
 					showMessageBanner("Invalid protocol. Use wss:// or ws://", 3000);
 					return;
 				}
-				
+
 				// Ensure hostname exists and looks reasonable
 				if (!url.hostname || url.hostname.length < 3 || url.hostname.includes(' ')) {
 					showMessageBanner("Invalid hostname in relay URL", 3000);
 					return;
 				}
-				
+
 				// Block obvious local/private networks for security
-				if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || 
+				if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' ||
 					url.hostname.startsWith('192.168.') || url.hostname.startsWith('10.') ||
 					url.hostname.startsWith('172.')) {
 					showMessageBanner("Local/private network relays not allowed", 3000);
 					return;
 				}
-				
+
 			} catch (error) {
 				showMessageBanner("Invalid relay URL format", 3000);
 				return;
 			}
-			
+
 			// NEW: Sanitize the name to prevent XSS
 			const sanitizedName = name.replace(/[<>&"']/g, '').substring(0, 50);
 			if (sanitizedName !== name) {
 				showMessageBanner("Name was sanitized (removed special characters/length)", 3000);
 			}
-			
+
 			const relays = JSON.parse(localStorage.getItem('savedRelays') || '[]');
 			relays.push({ name: sanitizedName, value });
 			localStorage.setItem('savedRelays', JSON.stringify(relays));
-			
+
 			document.getElementById('newRelayName').value = '';
 			document.getElementById('newRelayValue').value = '';
-			
+
 			updateSettingsDisplay();
 			updateSavedSelector();
-			
+
 			showMessageBanner(`Saved relay: ${sanitizedName}`, 2000);
 		}
 
@@ -1262,22 +1380,22 @@
 		function loadFeed() {
 			logToConsole('Load button clicked!');
 			const value = getInputValue();
-			
+
 			// If no input, use default feed
 			if (!value) {
 				logToConsole('No input found - loading default feed for beginners!');
-				
+
 				const defaultNpub = 'npub1v89nr2zax8ef0ceyu9te0sjyqv3newa3e82m0rd4kye3ekeyhv2sqf30cc';
-				
+
 				currentType = 'npub';
 				currentValue = defaultNpub;
-				
+
 				// Clear feed and start loading
 				currentFeed = [];
 				displayFeed([]);
-				
+
 				loadNpubFeed(defaultNpub);
-				
+
 				// Show info about what they're viewing (only if no alert exists yet)
 				setTimeout(() => {
 					const container = document.getElementById('feedContainer');
@@ -1298,7 +1416,14 @@
 
 			// Clear feed when switching types or values
 			if (currentType !== type || currentValue !== value) {
+				// Clean up old WebSocket connections
+				cleanupWebSockets();
+
+				// Clear old data to free memory
 				currentFeed = [];
+				imageProcessingQueue = [];
+				isProcessingImages = false;
+
 				displayFeed([]);
 			}
 
@@ -1315,40 +1440,40 @@
 		function createSecureMessageHandler(feedType, realNotes, relay, someFollows, since, currentLimit) {
 			return function(event) {
 				// Sanitize and limit log data to prevent log injection
-				const logData = typeof event.data === 'string' ? 
-					event.data.substring(0, 200).replace(/[<>&"']/g, '') : 
+				const logData = typeof event.data === 'string' ?
+					event.data.substring(0, 200).replace(/[<>&"']/g, '') :
 					'[non-string data]';
 				logToConsole("📨 RAW MESSAGE FROM RELAY: " + logData);
-				
+
 				try {
 					// Size limit check before parsing
 					if (typeof event.data === 'string' && event.data.length > 100000) {
 						logToConsole("🚫 Message too large, rejecting", 'error');
 						return;
 					}
-					
+
 					const message = JSON.parse(event.data);
-					
+
 					// Strict message structure validation
 					if (!Array.isArray(message) || message.length < 2) {
 						logToConsole("🚫 Invalid message format: not a proper array with minimum elements", 'error');
 						return;
 					}
-					
+
 					// Validate message type is string and allowed
 					const messageType = message[0];
 					if (typeof messageType !== 'string') {
 						logToConsole("🚫 Invalid message type: not a string", 'error');
 						return;
 					}
-					
+
 					// Only allow expected Nostr message types
 					const allowedTypes = ['EVENT', 'EOSE', 'NOTICE', 'OK'];
 					if (!allowedTypes.includes(messageType)) {
 						logToConsole("🚫 Unknown message type: " + messageType, 'error');
 						return;
 					}
-					
+
 					// Validate subscription ID format
 					if (messageType === 'EVENT' || messageType === 'EOSE') {
 						if (typeof message[1] !== 'string' || message[1].length > 100) {
@@ -1356,27 +1481,27 @@
 							return;
 						}
 					}
-					
+
 					// Sanitize log output to prevent log injection
 					const sanitizedMessage = JSON.stringify(message).substring(0, 300).replace(/[<>&"']/g, '');
 					logToConsole("📨 PARSED MESSAGE: " + sanitizedMessage);
 					logToConsole("📨 MESSAGE TYPE: " + messageType);
-					
+
 					if (messageType === "EVENT") {
 						// Validate EVENT message structure
 						if (message.length < 3) {
 							logToConsole("🚫 EVENT message missing required elements", 'error');
 							return;
 						}
-						
+
 						const noteData = message[2];
-						
+
 						// Strict event data validation
 						if (!noteData || typeof noteData !== 'object') {
 							logToConsole("🚫 EVENT data is not an object", 'error');
 							return;
 						}
-						
+
 						// Validate all required fields exist and have correct types
 						const requiredStringFields = ['id', 'pubkey', 'content', 'sig'];
 						for (const field of requiredStringFields) {
@@ -1385,61 +1510,61 @@
 								return;
 							}
 						}
-						
+
 						// Validate numeric fields
 						if (!noteData.hasOwnProperty('created_at') || !Number.isInteger(noteData.created_at)) {
 							logToConsole("🚫 EVENT invalid created_at", 'error');
 							return;
 						}
-						
+
 						if (!noteData.hasOwnProperty('kind') || !Number.isInteger(noteData.kind)) {
 							logToConsole("🚫 EVENT invalid kind", 'error');
 							return;
 						}
-						
+
 						// Validate tags is array
 						if (!noteData.hasOwnProperty('tags') || !Array.isArray(noteData.tags)) {
 							logToConsole("🚫 EVENT invalid tags", 'error');
 							return;
 						}
-						
+
 						// Size limits on critical fields
 						if (noteData.id.length !== 64 || noteData.pubkey.length !== 64 || noteData.sig.length !== 128) {
 							logToConsole("🚫 EVENT invalid field lengths", 'error');
 							return;
 						}
-						
+
 						if (noteData.content.length > 50000) {
 							logToConsole("🚫 EVENT content too long", 'error');
 							return;
 						}
-						
+
 						// Validate hex format for critical fields
 						const hexRegex = /^[a-f0-9]+$/i;
 						if (!hexRegex.test(noteData.id) || !hexRegex.test(noteData.pubkey) || !hexRegex.test(noteData.sig)) {
 							logToConsole("🚫 EVENT invalid hex format", 'error');
 							return;
 						}
-						
+
 						// Validate kind range
 						if (noteData.kind < 0 || noteData.kind > 65535) {
 							logToConsole("🚫 EVENT kind out of range", 'error');
 							return;
 						}
-						
+
 						// Validate timestamp is reasonable (not too far in past/future)
 						const now = Math.floor(Date.now() / 1000);
 						if (noteData.created_at < now - (365 * 24 * 60 * 60) || noteData.created_at > now + (24 * 60 * 60)) {
 							logToConsole("🚫 EVENT timestamp unreasonable", 'error');
 							return;
 						}
-						
+
 						// Validate tags array structure
 						if (noteData.tags.length > 1000) {
 							logToConsole("🚫 EVENT too many tags", 'error');
 							return;
 						}
-						
+
 						for (const tag of noteData.tags) {
 							if (!Array.isArray(tag) || tag.length === 0 || tag.length > 10) {
 								logToConsole("🚫 EVENT invalid tag structure", 'error');
@@ -1452,20 +1577,20 @@
 								}
 							}
 						}
-						
+
 						// VALIDATE EVENT FIRST with existing function
 						if (!validateEventFormat(noteData)) {
 							logToConsole("🚫 Rejecting invalid event from relay", 'error');
 							return;
 						}
-						
+
 						const isReply = noteData.tags && noteData.tags.some(tag => tag[0] === 'e');
 						if (isReply) {
 							logToConsole("⭐ Skipping reply note");
 							return;
 						}
 						logToConsole("📝 Got a real note: " + noteData.content.slice(0, 50) + "...");
-						
+
 						const prettyNote = {
 							id: noteData.id,
 							pubkey: noteData.pubkey,
@@ -1479,30 +1604,38 @@
 						// Check if we already have this note
 						const existingNote = realNotes.find(note => note.id === noteData.id);
 						if (!existingNote) {
-							realNotes.push(prettyNote);
+							// Prevent memory overflow - limit notes during collection
+							if (realNotes.length < MAX_FEED_SIZE * 2) {  // Allow collecting up to 2x display limit
+								realNotes.push(prettyNote);
+							} else {
+								logToConsole(`Note limit reached (${realNotes.length}), stopping collection`, 'warn');
+							}
 						}
 					}
-					
+
 					// Handle follows list (only for npub feeds)
 					if (feedType === 'npub' && messageType === "EVENT" && message.length >= 3 && message[2] && typeof message[2] === 'object' && message[2].kind === 3) {
 						const followsEvent = message[2];
 						logToConsole("📋 Got follows list!");
-						
+
 						const followedPubkeys = [];
 						followsEvent.tags.forEach(tag => {
 							if (tag[0] === 'p' && tag.length >= 2 && typeof tag[1] === 'string' && tag[1].length === 64) {
 								followedPubkeys.push(tag[1]);
 							}
 						});
-						
+
 						logToConsole("🤝 This person follows " + followedPubkeys.length + " people");
 						logToConsole("📝 Now getting notes from their follows...");
-						
-						const maxFollowsToCheck = document.getElementById('slowConnection').checked ? 100 : 500;
+
+						const maxFollowsToCheck = document.getElementById('slowConnection').checked ? 50 : 200;  // Reduced from 100/500
 						someFollows.length = 0; // Clear array
 						someFollows.push(...followedPubkeys.slice(0, maxFollowsToCheck));
 						since = Math.floor(Date.now() / 1000) - (24 * 60 * 60);
-						
+
+						// Reduce initial limit on slow connections
+						const initialLimit = document.getElementById('slowConnection').checked ? 50 : 100;
+
 						const notesRequest = [
 							"REQ",
 							"get-notes",
@@ -1510,35 +1643,40 @@
 								"kinds": [1],
 								"authors": someFollows,
 								"since": since,
-								"limit": 100
+								"limit": initialLimit
 							}
 						];
-						
+
 						logToConsole("📤 Asking for notes from " + someFollows.length + " follows (max " + maxFollowsToCheck + ")");
 						relay.send(JSON.stringify(notesRequest));
 					}
-					
+
 					if (messageType === "EOSE") {
 						// Validate EOSE message has subscription ID
 						if (message.length < 2 || typeof message[1] !== 'string') {
 							logToConsole("🚫 Invalid EOSE message format", 'error');
 							return;
 						}
-						
+
 						logToConsole("ℹ EOSE for subscription: " + message[1]);
-						
+
 						if (message[1] === "get-follows") {
 							logToConsole("✅ Done getting follows list");
 						}
-						
+
 						if (message[1] === "get-notes" || message[1] === "get-more-notes" || message[1] === "my-sub-id" || message[1] === "get-more-relay-notes") {
 							logToConsole("✅ Done getting notes", 'success');
 							logToConsole("📊 Current count: " + realNotes.length + " notes");
-							
-							if (realNotes.length < 100 && currentLimit < 2000) {
+
+							// Reduce thresholds on slow connections
+							const minNotes = document.getElementById('slowConnection').checked ? 30 : 100;
+							const maxLimit = document.getElementById('slowConnection').checked ? 500 : 2000;
+							const limitIncrement = document.getElementById('slowConnection').checked ? 50 : 200;
+
+							if (realNotes.length < minNotes && currentLimit < maxLimit) {
 								logToConsole("🔥 Need more notes, increasing limit and trying again");
-								currentLimit = currentLimit + 200;
-								
+								currentLimit = currentLimit + limitIncrement;
+
 								const requestId = feedType === 'npub' ? "get-more-notes" : "get-more-relay-notes";
 								const notesRequest = [
 									"REQ",
@@ -1550,16 +1688,16 @@
 										"limit": currentLimit
 									}
 								];
-								
+
 								// Remove undefined properties
 								if (feedType !== 'npub') {
 									delete notesRequest[2].authors;
 								}
-								
+
 								relay.send(JSON.stringify(notesRequest));
 								return;
 							}
-							
+
 							currentFeed = realNotes;
 							displayFeed(realNotes);
 							setLoading(false);
@@ -1567,7 +1705,7 @@
 							logToConsole("📌 Connection closed - stopping at " + realNotes.length + " notes");
 						}
 					}
-					
+
 					if (messageType === "NOTICE") {
 						// Validate NOTICE message and sanitize content
 						if (message.length >= 2 && typeof message[1] === 'string' && message[1].length < 1000) {
@@ -1578,7 +1716,7 @@
 							logToConsole("🚫 Invalid NOTICE message format", 'error');
 						}
 					}
-					
+
 				} catch (e) {
 					// Don't log the full error message (could contain sensitive data)
 					logToConsole("💥 FAILED TO PARSE MESSAGE: Invalid JSON or processing error", 'error');
@@ -1588,16 +1726,16 @@
 
 		async function loadNpubFeed(npub) {
 			if (isLoading) return;
-			
+
 			setLoading(true);
-			
+
 			const realNotes = [];
 			let someFollows = [];
 			let since = 0;
 			let topLevelNotesCount = 0;
-			const targetNotes = 100;
-			let currentLimit = 200; // Start with this many notes per request
-			
+			const targetNotes = document.getElementById('slowConnection').checked ? 50 : 100;  // Reduce target on slow connections
+			let currentLimit = document.getElementById('slowConnection').checked ? 100 : 200; // Start with this many notes per request
+
 			try {
 				logToConsole("🔍 Looking up follows for: " + npub);
 
@@ -1617,7 +1755,7 @@
 				}
 
 				logToConsole("🔑 Using pubkey: " + realPubkey);
-				
+
 				const relay = await connectToRelay();
 
 				// Store this working relay connection for potential reuse
@@ -1649,7 +1787,7 @@
 					showError('Relay connection lost during operation.');
 					setLoading(false);
 				};
-				
+
 			} catch (error) {
 				showError('Failed to load npub feed: ' + error.message);
 				setLoading(false);
@@ -1669,18 +1807,22 @@
 					reject(new Error('Invalid URL format'));
 					return;
 				}
-				
+
 				const relay = new WebSocket(relayUrl);
+
+				// Track active WebSocket for cleanup
+				activeWebSockets.push(relay);
+
 				let timeoutId = null;
 				let isResolved = false;
-				
+
 				const cleanup = () => {
 					if (timeoutId) {
 						clearTimeout(timeoutId);
 						timeoutId = null;
 					}
 				};
-				
+
 				const resolveOnce = (value) => {
 					if (!isResolved) {
 						isResolved = true;
@@ -1688,7 +1830,7 @@
 						resolve(value);
 					}
 				};
-				
+
 				const rejectOnce = (error) => {
 					if (!isResolved) {
 						isResolved = true;
@@ -1699,23 +1841,23 @@
 						reject(error);
 					}
 				};
-				
+
 				timeoutId = setTimeout(() => {
 					logToConsole(`Connection timeout for ${relayUrl}`, 'warn');
 					rejectOnce(new Error(`Connection timeout after 5 seconds`));
 				}, 5000);
-				
+
 				relay.onopen = function() {
 					logToConsole(`WebSocket opened successfully: ${relayUrl}`, 'success');
 					resolveOnce(relay);
 				};
-				
+
 				relay.onerror = function(error) {
 					const errorMsg = error.message || error.type || 'Unknown WebSocket error';
 					logToConsole(`WebSocket error for ${relayUrl}: ${errorMsg}`, 'error');
 					rejectOnce(new Error(`WebSocket connection failed: ${errorMsg}`));
 				};
-				
+
 				relay.onclose = function(event) {
 					if (!isResolved) {
 						const reason = event.reason || `Code ${event.code}`;
@@ -1730,24 +1872,24 @@
 		async function connectToRelay() {
 			const PRIMARY_RELAY = 'wss://relay.damus.io';
 			const allRelays = [PRIMARY_RELAY, ...FALLBACK_RELAYS];
-			
+
 			for (let i = 0; i < allRelays.length; i++) {
 				const relayUrl = allRelays[i];
 				logToConsole(`Attempting connection ${i + 1}/${allRelays.length}: ${relayUrl}`);
-				
+
 				// Basic check for hardcoded relays (don't wait long, just try)
 				const relayInfo = await getRelayInfo(relayUrl);
 				if (relayInfo) {
 					logToConsole(`Relay ${relayUrl}: ${relayInfo.name || 'unnamed'} (${relayInfo.software || 'unknown software'})`);
 				}
-				
+
 				try {
 					const relay = await tryConnectToSingleRelay(relayUrl);
 					logToConsole(`Successfully connected to: ${relayUrl}`, 'success');
 					return relay;
 				} catch (error) {
 					logToConsole(`Failed to connect to ${relayUrl}: ${error.message}`, 'error');
-					
+
 					if (i === allRelays.length - 1) {
 						throw new Error('All relays failed to connect');
 					}
@@ -1757,33 +1899,34 @@
 
 		async function loadRelayFeed(relayUrl) {
 			if (isLoading) return;
-			
+
 			setLoading(true);
-			
-			let currentLimit = 200; // Start with this many notes per request
-			const realNotes = []; 			
-			let since = 0; 
-			
+
+			// Adjust initial limit based on connection speed
+			let currentLimit = document.getElementById('slowConnection').checked ? 100 : 200;
+			const realNotes = [];
+			let since = 0;
+
 			try {
 				logToConsole("User relay detected - performing comprehensive checks...");
-				
+
 				// Comprehensive relay validation for user-entered relays
 				const relayInfo = await getRelayInfo(relayUrl);
-				
+
 				if (relayInfo) {
 					logToConsole(`Relay Info: ${relayInfo.name || 'Unnamed'}`);
 					logToConsole(`Description: ${relayInfo.description || 'No description'}`);
 					logToConsole(`Software: ${relayInfo.software || 'Unknown'} ${relayInfo.version || ''}`);
-					
+
 					// Show relay info in banner instead of separate element
 					const relayName = relayInfo.name || 'Unnamed Relay';
 					const relayDesc = relayInfo.description || 'No description';
 					showMessageBanner(`Connected to relay: ${relayName} - ${relayDesc}`, 8000);
-					
+
 					// Check supported NIPs
 					if (relayInfo.supported_nips && relayInfo.supported_nips.length > 0) {
 						logToConsole(`Supported NIPs: [${relayInfo.supported_nips.join(', ')}]`);
-						
+
 						// Check if it supports basic requirements
 						if (!relayInfo.supported_nips.includes(1)) {
 							showMessageBanner("WARNING: This relay doesn't support basic text notes (NIP-01)", 5000);
@@ -1791,7 +1934,7 @@
 					} else {
 						logToConsole("No NIP information provided by relay", 'warn');
 					}
-					
+
 					// Check limitations
 					if (relayInfo.limitation) {
 						const limits = relayInfo.limitation;
@@ -1805,42 +1948,46 @@
 							showMessageBanner(`INFO: This relay limits queries to ${limits.max_limit} events`, 3000);
 						}
 					}
-					
+
 				} else {
 					showMessageBanner("WARNING: Could not get information about this relay", 4000);
 				}
-				
+
 				logToConsole("Attempting WebSocket connection to: " + relayUrl);
-				
+
 				const relay = new WebSocket(relayUrl);
 
-				
+
 				relay.onopen = function() {
 					logToConsole("Connected to relay: " + relayUrl);
-					
+
 					since = Math.floor(Date.now() / 1000) - (24 * 60 * 60); // Always 24 hours (remove const)
+
+					// Reduce limit on slow connections
+					const requestLimit = document.getElementById('slowConnection').checked ? 200 : 1000;
+
 					const requestMessage = [
 						"REQ",
 						"my-sub-id",
 						{
 							"kinds": [1],
 							"since": since,
-							"limit": 1000  // Fixed at 1000 notes max (current setting)
+							"limit": requestLimit
 						}
 					];
-					
+
 					logToConsole("Asking relay for notes");
 					relay.send(JSON.stringify(requestMessage));
 				};
-				
+
 				relay.onmessage = createSecureMessageHandler('relay', realNotes, relay, [], since, currentLimit);
-				
+
 				relay.onerror = function(error) {
 					logToConsole("Connection error: " + error);
 					showError('Failed to connect to relay');
 					setLoading(false);
 				};
-				
+
 			} catch (error) {
 				showError('Failed to load relay feed: ' + error.message);
 				setLoading(false);
@@ -1850,18 +1997,17 @@
 		function displayFeed(notes, fetchUsernames = true) {
 			const container = document.getElementById('feedContainer');
 			const sortOrder = document.getElementById('sortOrder').value;
-			
-			// Limit feed size to prevent memory issues
-			const MAX_FEED_SIZE = 500;
+
+			// Limit feed size to prevent memory issues - use global constant
 			if (notes.length > MAX_FEED_SIZE) {
 				logToConsole(`Feed limited to ${MAX_FEED_SIZE} notes (was ${notes.length})`, 'warn');
 				notes = notes.slice(0, MAX_FEED_SIZE);
 			}
-			
+
 			// Clear container but preserve demo alert if we're still on demo feed
 			const existingDemoAlert = container.querySelector('[data-demo-alert="true"]');
-			const shouldPreserveDemoAlert = existingDemoAlert && 
-				currentType === 'npub' && 
+			const shouldPreserveDemoAlert = existingDemoAlert &&
+				currentType === 'npub' &&
 				currentValue === 'npub1v89nr2zax8ef0ceyu9te0sjyqv3newa3e82m0rd4kye3ekeyhv2sqf30cc';
 
 			// Fast clear with fallback for older browsers
@@ -1880,17 +2026,17 @@
 					container.appendChild(existingDemoAlert);
 				}
 			}
-			
+
 			// Clear image processing state
 			imageProcessingQueue = [];
 			isProcessingImages = false;
-			
+
 			// Prevent multiple simultaneous username fetches
 			if (fetchUsernames && isLookingUpUsernames) {
 				fetchUsernames = false;
 				logToConsole("Skipping username fetch - already in progress");
 			}
-			
+
 			// Check if we might have hit the limit and add warning AFTER clearing
 			if (notes.length >= 500) {
 				const warning = document.createElement('div');
@@ -1898,7 +2044,7 @@
 				warning.textContent = 'Warning: Showing 1000+ notes (may be incomplete). This relay has lots of activity!';
 				container.appendChild(warning);
 			}
-			
+
 			if (notes.length === 0) {
 				const emptyDiv = document.createElement('div');
 				emptyDiv.className = 'empty-state';
@@ -1908,29 +2054,29 @@
 				container.appendChild(emptyDiv);
 				return;
 			}
-			
+
 			// Sort notes
 			const sortedNotes = [...notes].sort((a, b) => {
 				return sortOrder === 'newest' ? b.timestamp - a.timestamp : a.timestamp - b.timestamp;
 			});
-			
+
 			sortedNotes.forEach(note => {
 				const noteElement = document.createElement('div');
 				noteElement.className = 'note';
-				
+
 				const date = new Date(note.timestamp * 1000);
 				const timeString = date.toLocaleString();
 				const relativeTime = formatRelativeTime(note.timestamp);
-				
+
 				const authorDisplay = note.displayName || (note.pubkey ? note.pubkey.slice(0, 8) + "..." : note.author);
-				
+
 				const noteHeader = document.createElement('div');
 				noteHeader.className = 'note-header';
 
 				const authorStrong = document.createElement('strong');
 				authorStrong.className = 'author-name';
 				authorStrong.setAttribute('data-pubkey', note.pubkey || '');
-				authorStrong.textContent = authorDisplay; 
+				authorStrong.textContent = authorDisplay;
 
 				const timeSpan = document.createElement('span');
 				timeSpan.className = 'note-time';
@@ -1955,18 +2101,18 @@
 				if (safeContent.length > 250) {
 					const shortContent = safeContent.slice(0, 250);
 					const fullContent = safeContent;
-					
+
 					// Clear the content div
 					noteContentDiv.innerHTML = '';
-					
+
 					// Create short content span
 					const shortSpan = document.createElement('span');
 					shortSpan.className = 'note-short';
-					
+
 					// Add the short content safely
 					const shortContentElement = escapeHtml(shortContent + '... ');
 					shortSpan.appendChild(shortContentElement);
-					
+
 					// Create "show more" button
 					const showMoreBtn = document.createElement('button');
 					showMoreBtn.textContent = 'show more';
@@ -1975,18 +2121,18 @@
 						shortSpan.style.display = 'none';
 						fullSpan.style.display = 'block';
 					});
-					
+
 					shortSpan.appendChild(showMoreBtn);
-					
+
 					// Create full content span
 					const fullSpan = document.createElement('span');
 					fullSpan.className = 'note-full';
 					fullSpan.style.display = 'none';
-					
+
 					// Add the full content safely
 					const fullContentElement = escapeHtml(fullContent + ' ');
 					fullSpan.appendChild(fullContentElement);
-					
+
 					// Create "show less" button
 					const showLessBtn = document.createElement('button');
 					showLessBtn.textContent = 'show less';
@@ -1995,17 +2141,17 @@
 						fullSpan.style.display = 'none';
 						shortSpan.style.display = 'block';
 					});
-					
+
 					fullSpan.appendChild(showLessBtn);
-					
+
 					// Add both spans to the content div
 					noteContentDiv.appendChild(shortSpan);
 					noteContentDiv.appendChild(fullSpan);
-					
+
 				} else {
 					// Clear the content div first
 					noteContentDiv.innerHTML = '';
-					
+
 					// Add the content safely
 					const safeContentElement = escapeHtml(safeContent);
 					noteContentDiv.appendChild(safeContentElement);
@@ -2016,10 +2162,10 @@
 
 				// Process images after adding the note to DOM
 				processImagesInContent(safeContent, noteElement);
-				
+
 				container.appendChild(noteElement);
 			});
-			
+
 			// Only fetch usernames if we don't have them yet
 			if (fetchUsernames) {
 				setTimeout(() => {
@@ -2039,7 +2185,7 @@
         function updateThemeIcon() {
             const themeBtn = document.getElementById('themeBtn');
             const currentTheme = document.body.getAttribute('data-theme') || 'light';
-            
+
             if (currentTheme === 'dark') {
                 themeBtn.textContent = '🌙';
             } else if (currentTheme === 'clown') {
@@ -2052,7 +2198,7 @@
 		function toggleTheme() {
 			const body = document.body;
 			const currentTheme = body.getAttribute('data-theme') || 'light';
-			
+
 			let newTheme;
 			if (currentTheme === 'light') {
 				newTheme = 'dark';
@@ -2061,7 +2207,7 @@
 			} else {
 				newTheme = 'light';
 			}
-			
+
 			body.setAttribute('data-theme', newTheme);
 			localStorage.setItem('theme', newTheme);
 			updateThemeIcon();
@@ -2071,39 +2217,39 @@
 			if (isLookingUpUsernames) {
 				return;
 			}
-			
+
 			// Skip if slow connection is checked
 			if (document.getElementById('slowConnection').checked) {
 				logToConsole("⚡ Skipping usernames - slow connection mode");
 				return;
 			}
-			
+
 			logToConsole("👤 Starting username lookups...");
 			isLookingUpUsernames = true;
-			
+
 			// Get all unique pubkeys from current feed that don't have display names yet
 			const pubkeysToFetch = [...new Set(currentFeed
 				.filter(note => !note.displayName) // Only fetch if we don't have it
 				.map(note => note.pubkey)
 				.filter(Boolean)
 			)];
-			
+
 			if (pubkeysToFetch.length === 0) {
 				isLookingUpUsernames = false;
 				return;
 			}
-			
+
 			logToConsole(`🔍 Looking up ${pubkeysToFetch.length} unique authors`);
-			
+
 			// Try to reuse existing connection, otherwise create new one
 			let relay = null;
 			let shouldCloseRelay = false;
 
-			if (window.lastWorkingRelay && 
-				window.lastWorkingRelay.readyState === WebSocket.OPEN && 
-				window.lastRelayUrl && 
+			if (window.lastWorkingRelay &&
+				window.lastWorkingRelay.readyState === WebSocket.OPEN &&
+				window.lastRelayUrl &&
 				window.lastRelayUrl.includes('damus.io')) {
-				
+
 				logToConsole("♻️ Reusing existing relay connection for profiles");
 				relay = window.lastWorkingRelay;
 				shouldCloseRelay = false; // Don't close shared connection
@@ -2115,7 +2261,7 @@
 
 			const sendProfileRequest = function() {
 				logToConsole("👤 Requesting profiles");
-				
+
 				// Request profiles (kind 0 events)
 				const profileRequest = [
 					"REQ",
@@ -2126,7 +2272,7 @@
 						"limit": pubkeysToFetch.length
 					}
 				];
-				
+
 				relay.send(JSON.stringify(profileRequest));
 			};
 
@@ -2135,14 +2281,14 @@
 			} else {
 				relay.onopen = sendProfileRequest;
 			}
-			
+
 			relay.onmessage = function(event) {
 				const message = JSON.parse(event.data);
-				
+
 				if (message[0] === "EVENT" && message[2].kind === 0) {
 					const profileData = message[2];
 					const pubkey = profileData.pubkey;
-					
+
 					try {
 						// NEW: Validate content before parsing
 						if (!profileData.content || typeof profileData.content !== 'string') {
@@ -2157,34 +2303,34 @@
 						}
 
 						const profile = JSON.parse(profileData.content);
-						
+
 						// NEW: Validate profile is an object
 						if (!profile || typeof profile !== 'object') {
 							logToConsole("Invalid profile data format", 'error');
 							return;
 						}
-						
+
 						// Sanitize display name - only allow safe characters
 						let rawDisplayName = profile.display_name || profile.name || '';
-						
+
 						// NEW: Ensure it's a string
 						if (typeof rawDisplayName !== 'string') {
 							rawDisplayName = '';
 						}
-						
+
 						// Remove any HTML tags and dangerous characters
 						rawDisplayName = rawDisplayName.replace(/<[^>]*>/g, ''); // Strip HTML
 						rawDisplayName = rawDisplayName.replace(/[<>&"']/g, ''); // Remove dangerous chars
 						rawDisplayName = rawDisplayName.trim();
-						
+
 						// Limit length to prevent UI issues
 						if (rawDisplayName.length > 50) {
 							rawDisplayName = rawDisplayName.slice(0, 50) + '...';
 						}
-						
+
 						// Use sanitized name or fallback
 						const displayName = rawDisplayName || pubkey.slice(0, 8) + "...";
-						
+
 						// Validate avatar URL
 						let safeAvatarUrl = null;
 						if (profile.picture && typeof profile.picture === 'string') {
@@ -2197,9 +2343,9 @@
 								// Invalid URL - ignore silently
 							}
 						}
-						
+
 						logToConsole(`👤 Found name: ${displayName} for ${pubkey.slice(0, 8)}...`);
-						
+
 						// UPDATE THE NOTES DATA
 						currentFeed.forEach(note => {
 							if (note.pubkey === pubkey) {
@@ -2207,7 +2353,7 @@
 								note.avatar = safeAvatarUrl;
 							}
 						});
-						
+
 						// UPDATE ONLY THE DOM ELEMENTS for this pubkey - batch DOM updates for better performance
 						const authorElements = document.querySelectorAll(`[data-pubkey="${pubkey}"]`);
 
@@ -2218,18 +2364,18 @@
 						authorElements.forEach(element => {
 							// Update the text content
 							element.textContent = displayName;
-							
+
 							// Add avatar if we have one and not in slow connection mode
 							if (safeAvatarUrl && !document.getElementById('slowConnection').checked && !element.querySelector('img')) {
 								loadProfileImage(safeAvatarUrl, element, pubkey);
 							}
 						});
-						
+
 					} catch (e) {
 						logToConsole("⚠ Failed to parse profile for " + pubkey.slice(0, 8));
 					}
 				}
-				
+
 				if (message[0] === "EOSE") {
 					logToConsole("✅ Done fetching profiles");
 					if (shouldCloseRelay) {
@@ -2238,7 +2384,7 @@
 					isLookingUpUsernames = false;
 				}
 			};
-			
+
 			relay.onerror = function(error) {
 				logToConsole("❌ Profile lookup failed: " + error);
 				if (shouldCloseRelay) {
@@ -2253,14 +2399,14 @@
 			const infoDiv = document.createElement('div');
 			infoDiv.style.cssText = 'background: #dbeafe; border: 1px solid #3b82f6; padding: 12px; margin-bottom: 16px; border-radius: 6px; font-size: 14px;';
 			infoDiv.setAttribute('data-demo-alert', 'true');
-			
+
 			const strongText = document.createElement('strong');
 			strongText.textContent = "You're viewing a demo feed!";
-			
+
 			const br = document.createElement('br');
-			
+
 			const description = document.createTextNode('This shows recent notes from people followed by a Nostr vibecoder who tries to follow real, interesting people. That said, NOSTR is uncensored, so use at your own risk, and be careful clicking links.');
-			
+
 			const learnBtn = document.createElement('button');
 			learnBtn.textContent = 'Learn More';
 			learnBtn.style.cssText = 'padding: 2px 6px; border: none; background: #3b82f6; color: white; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 4px; min-height: auto;';
@@ -2280,7 +2426,7 @@
 			infoDiv.appendChild(br);
 			infoDiv.appendChild(description);
 			infoDiv.appendChild(buttonContainer);
-			
+
 			// Insert at the top of the feed container
 			container.insertBefore(infoDiv, container.firstChild);
 		}
@@ -2288,7 +2434,7 @@
 		function formatRelativeTime(timestamp) {
 			const now = Math.floor(Date.now() / 1000);
 			const diff = now - timestamp;
-			
+
 			if (diff < 60) return 'just now';
 			if (diff < 3600) return Math.floor(diff / 60) + ' minutes ago';
 			if (diff < 86400) return Math.floor(diff / 3600) + ' hours ago';
@@ -2301,7 +2447,7 @@
 			return text.replace(/([^<]*?)(<[^>]*>)/g, function(match, textPart, htmlPart) {
 				const shortenedText = textPart.replace(/\b[a-zA-Z0-9]{20,}\b/g, function(longString) {
 					// Skip if it's already a known nostr identifier
-					if (longString.startsWith('npub1') || longString.startsWith('note1') || 
+					if (longString.startsWith('npub1') || longString.startsWith('note1') ||
 						longString.startsWith('nevent1') || longString.startsWith('nprofile1')) {
 						return longString;
 					}
@@ -2312,6 +2458,11 @@
 		}
 
 		function loadProfileImage(imageUrl, authorElement, pubkey) {
+			// Skip on slow connection mode
+			if (document.getElementById('slowConnection').checked) {
+				return;
+			}
+
 			// Validate URL first
 			try {
 				const url = new URL(imageUrl);
@@ -2321,20 +2472,21 @@
 			} catch (e) {
 				return; // Skip invalid URLs
 			}
-			
+
 			// Check file size with HEAD request before downloading
-			fetch(imageUrl, { 
+			fetch(imageUrl, {
 				method: 'HEAD',
 				signal: AbortSignal.timeout(1200) // 1.2 second timeout
 			})
 			.then(response => {
 				const contentLength = response.headers.get('content-length');
-				
-				if (contentLength && parseInt(contentLength) > 300000) {
+
+				// Stricter size limit for avatars (50KB max)
+				if (contentLength && parseInt(contentLength) > 50000) {
 					logToConsole(`Avatar too large: ${Math.round(contentLength/1000)}kb`, 'warn');
 					return;
 				}
-				
+
 				// Size is acceptable, now create and load the avatar
 				const avatar = document.createElement('img');
 				avatar.src = imageUrl;
@@ -2343,12 +2495,12 @@
 				avatar.crossOrigin = 'anonymous';
 				avatar.referrerPolicy = 'no-referrer';
 				avatar.loading = 'lazy';
-				
-				avatar.onerror = function() { 
-					this.style.display = 'none'; 
+
+				avatar.onerror = function() {
+					this.style.display = 'none';
 					this.remove();
 				};
-				
+
 				// Insert before the name text
 				authorElement.insertBefore(avatar, authorElement.firstChild);
 			})
@@ -2363,14 +2515,14 @@
 			if (typeof text !== 'string') {
 				return document.createTextNode('[Invalid content type]');
 			}
-			
+
 			if (text.length > 50000) {
 				text = text.substring(0, 50000) + '... [content truncated for security]';
 			}
-			
+
 			// Create a container div to hold all content
 			const container = document.createElement('div');
-			
+
 			// Whitelist of allowed domains with their labels
 			const allowedDomains = {
 				'youtube.com': 'video',
@@ -2399,32 +2551,32 @@
 				'fountain.fm': 'media',
 				'nostrmedia.com': 'media'
 			};
-			
+
 			// Simple URL regex - only matches http/https
 			const urlRegex = /(https?:\/\/[^\s<>"'\[\]{}|\\^`]+)/gi;
 			const parts = text.split(urlRegex);
-			
+
 			for (let i = 0; i < parts.length; i++) {
 				const part = parts[i];
-				
+
 				if (part.match(urlRegex)) {
 					try {
 						const urlObj = new URL(part);
-						
+
 						// Only allow HTTP/HTTPS
 						if (urlObj.protocol !== 'https:' && urlObj.protocol !== 'http:') {
 							const textNode = document.createTextNode(part);
 							container.appendChild(textNode);
 							continue;
 						}
-						
+
 						// Safety checks
 						if (urlObj.hostname.length > 100 || part.length > 2000) {
 							const textNode = document.createTextNode('[suspicious URL blocked]');
 							container.appendChild(textNode);
 							continue;
 						}
-						
+
 						// Create link element
 						const linkElement = document.createElement('a');
 						linkElement.href = part;
@@ -2432,22 +2584,22 @@
 						linkElement.rel = 'noopener noreferrer';
 						linkElement.style.color = 'var(--accent-orange)';
 						linkElement.style.textDecoration = 'underline';
-						
+
 						// Check if domain is in whitelist
 						const domain = urlObj.hostname.replace(/^www\./, '').toLowerCase();
 						let linkType = 'unknown web';
-						
+
 						for (const [allowedDomain, label] of Object.entries(allowedDomains)) {
 							if (domain === allowedDomain || domain.endsWith('.' + allowedDomain)) {
 								linkType = label;
 								break;
 							}
 						}
-						
+
 						// Set display text
 						linkElement.textContent = `${domain}/[${linkType}]`;
 						container.appendChild(linkElement);
-						
+
 					} catch (e) {
 						// If URL parsing fails, show as plain text
 						const textNode = document.createTextNode(part);
@@ -2457,17 +2609,17 @@
 					// Handle nostr identifiers
 					const nostrRegex = /(npub1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{58}|note1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{58}|nevent1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{10,}|nprofile1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{10,})/g;
 					const nostrParts = part.split(nostrRegex);
-					
+
 					for (let j = 0; j < nostrParts.length; j++) {
 						const nostrPart = nostrParts[j];
-						
+
 						if (nostrPart.match(nostrRegex)) {
 							if (nostrPart.length > 200) {
 								const textNode = document.createTextNode('[nostr ID too long]');
 								container.appendChild(textNode);
 								continue;
 							}
-							
+
 							const nostrLink = document.createElement('a');
 							nostrLink.href = `https://njump.me/${nostrPart}`;
 							nostrLink.target = '_blank';
@@ -2475,26 +2627,26 @@
 							nostrLink.style.color = 'var(--accent-orange)';
 							nostrLink.style.textDecoration = 'underline';
 							nostrLink.textContent = nostrPart.substring(0, nostrPart.indexOf('1') + 2) + '...';
-							
+
 							container.appendChild(document.createTextNode('\u00A0'));
 							container.appendChild(nostrLink);
 						} else {
 							// Regular text - shorten very long strings
 							let processedText = nostrPart.replace(/\b[a-zA-Z0-9]{25,}\b/g, function(longString) {
-								if (longString.startsWith('npub1') || longString.startsWith('note1') || 
+								if (longString.startsWith('npub1') || longString.startsWith('note1') ||
 									longString.startsWith('nevent1') || longString.startsWith('nprofile1')) {
 									return longString;
 								}
 								return longString.slice(0, 15) + '...';
 							});
-							
+
 							const textNode = document.createTextNode(processedText);
 							container.appendChild(textNode);
 						}
 					}
 				}
 			}
-			
+
 			return container;
 		}
 
@@ -2504,8 +2656,8 @@
 			if (loading) {
 				// Clear container but preserve demo alert if we're still on demo feed
 				const existingDemoAlert = container.querySelector('[data-demo-alert="true"]');
-				const shouldPreserveDemoAlert = existingDemoAlert && 
-					currentType === 'npub' && 
+				const shouldPreserveDemoAlert = existingDemoAlert &&
+					currentType === 'npub' &&
 					currentValue === 'npub1v89nr2zax8ef0ceyu9te0sjyqv3newa3e82m0rd4kye3ekeyhv2sqf30cc';
 
 				// Fast clear with fallback for older browsers
@@ -2521,7 +2673,7 @@
 				if (shouldPreserveDemoAlert) {
 					container.appendChild(existingDemoAlert);
 				}
-				
+
 				// Create loading div
 				const loadingDiv = document.createElement('div');
 				loadingDiv.className = 'loading';
@@ -2532,11 +2684,11 @@
 
 		function showError(message) {
 			const container = document.getElementById('feedContainer');
-			
+
 			// Clear container but preserve demo alert if we're still on demo feed
 			const existingDemoAlert = container.querySelector('[data-demo-alert="true"]');
-			const shouldPreserveDemoAlert = existingDemoAlert && 
-				currentType === 'npub' && 
+			const shouldPreserveDemoAlert = existingDemoAlert &&
+				currentType === 'npub' &&
 				currentValue === 'npub1v89nr2zax8ef0ceyu9te0sjyqv3newa3e82m0rd4kye3ekeyhv2sqf30cc';
 
 			// Fast clear with fallback for older browsers
@@ -2578,28 +2730,42 @@
 			if (!event || !event.target) {
 				return;
 			}
-			
+
 			const modal = document.getElementById('settingsModal');
 			if (event.target === modal) {
 				closeSettings();
 			}
 		});
-		
+
 		// Handle slow connection checkbox changes
 		document.getElementById('slowConnection').addEventListener('change', function() {
 			const consoleBanner = document.getElementById('consoleBanner');
-			
+
 			if (this.checked) {
 				logToConsole("Slow connection mode enabled");
 				consoleBanner.classList.remove('show');
-				showMessageBanner("Slow connection mode enabled.  To save bandwidth, fewer notes, no avatars are fetched, and usernames not resolved", 6000);
-				
+				showMessageBanner("Slow connection mode enabled. Fewer notes, smaller images, no avatars, and automatic memory cleanup.", 6000);
+
+				// Enable automatic image cleanup on scroll
+				window.addEventListener('scroll', handleSlowConnectionScroll);
+
 			} else {
 				consoleBanner.classList.add('show');
-				
 				showMessageBanner("Slow connection mode disabled", 3000);
+
+				// Disable automatic image cleanup
+				window.removeEventListener('scroll', handleSlowConnectionScroll);
 			}
 		});
+
+		// Handler for scroll events in slow connection mode
+		let scrollTimeout;
+		function handleSlowConnectionScroll() {
+			clearTimeout(scrollTimeout);
+			scrollTimeout = setTimeout(() => {
+				unloadOffscreenImages();
+			}, 2000);  // Clean up 2 seconds after scroll stops
+		}
 
 		// Handle selector change
 		document.getElementById('savedSelector').addEventListener('change', function() {
