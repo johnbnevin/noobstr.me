@@ -2539,6 +2539,7 @@
 				'nostr.build': 'image',
 				'github.com': 'dev',
 				'gitlab.com': 'dev',
+				'damus.io': 'nostr',
 				'njump.me': 'nostr',
 				'nostr.band': 'nostr',
 				'nostrudel.ninja': 'nostr',
@@ -2622,12 +2623,18 @@
 							}
 
 							const nostrLink = document.createElement('a');
-							nostrLink.href = `https://njump.me/${nostrPart}`;
+							// Use damus.io as primary (format: damus.io/npub1...)
+							nostrLink.href = `https://damus.io/${nostrPart}`;
 							nostrLink.target = '_blank';
 							nostrLink.rel = 'noopener noreferrer';
 							nostrLink.style.color = 'var(--accent-orange)';
 							nostrLink.style.textDecoration = 'underline';
 							nostrLink.textContent = nostrPart.substring(0, nostrPart.indexOf('1') + 2) + '...';
+
+							// Add error handler to fallback to njump.me if damus.io fails
+							nostrLink.addEventListener('error', function() {
+								this.href = `https://njump.me/${nostrPart}`;
+							});
 
 							container.appendChild(document.createTextNode('\u00A0'));
 							container.appendChild(nostrLink);
